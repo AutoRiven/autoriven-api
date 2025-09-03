@@ -39,7 +39,7 @@ echo.
 echo ✅ Setup completed!
 echo.
 echo Next steps:
-echo 1. Update the .env file with your database and Elasticsearch configuration
+echo 1. Update the .env file with your database, Elasticsearch, and scrape.do configuration
 echo 2. Make sure PostgreSQL and Elasticsearch are running
 echo 3. Run 'npm run seed' to create initial users (optional)
 echo 4. Run 'npm run start:dev' to start the development server
@@ -50,5 +50,6 @@ echo   Password: Admin@123
 echo.
 echo API will be available at: http://localhost:3000/api
 echo Health check: http://localhost:3000/api/health
+echo Scraping health: http://localhost:3000/api/scraping/health
 
 pause

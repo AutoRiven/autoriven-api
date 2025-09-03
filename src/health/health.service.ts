@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Optional } from '@nestjs/common';
 import { DataSource } from 'typeorm';
 import { ElasticsearchService } from '@nestjs/elasticsearch';
 
@@ -6,7 +6,7 @@ import { ElasticsearchService } from '@nestjs/elasticsearch';
 export class HealthService {
   constructor(
     private readonly dataSource: DataSource,
-    private readonly elasticsearchService: ElasticsearchService,
+    @Optional() private readonly elasticsearchService?: ElasticsearchService,
   ) {}
 
   async getHealth() {
@@ -42,6 +42,13 @@ export class HealthService {
 
   async getElasticsearchHealth() {
     try {
+      if (!this.elasticsearchService) {
+        return {
+          status: 'unavailable',
+          message: 'Elasticsearch service not available',
+        };
+      }
+      
       const health = await this.elasticsearchService.cluster.health();
       return {
         status: 'healthy',

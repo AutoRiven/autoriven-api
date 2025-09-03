@@ -38,6 +38,15 @@ Authorization: Bearer <jwt_token>
 ### Search
 - **GET** `/search/users` - Search users with filters (Admin only)
 
+### Web Scraping (Allegro.pl)
+- **GET** `/scraping/health` - Scraping service health check (Admin only)
+- **GET** `/scraping/categories` - Scrape Allegro categories (Admin only)
+- **GET** `/scraping/categories/{categoryUrl}/subcategories` - Scrape subcategories (Admin only)
+- **GET** `/scraping/products` - Scrape products from category (Admin only)
+- **GET** `/scraping/search` - Search products on Allegro (Admin only)  
+- **GET** `/scraping/product/{productUrl}` - Get detailed product info (Admin only)
+- **POST** `/scraping/batch-scrape` - Batch scraping operation (Admin only)
+
 ## Request/Response Examples
 
 ### Register Customer
@@ -145,6 +154,75 @@ Response:
       "updatedAt": "2025-09-02T..."
     }
   ]
+}
+```
+
+### Scrape Allegro Categories (Admin)
+```http
+GET /api/scraping/categories
+Authorization: Bearer <admin_jwt_token>
+```
+
+Response:
+```json
+{
+  "success": true,
+  "data": [
+    {
+      "id": "motoryzacja",
+      "name": "Motoryzacja",
+      "url": "https://allegro.pl/kategoria/motoryzacja"
+    },
+    {
+      "id": "elektronika",
+      "name": "Elektronika",
+      "url": "https://allegro.pl/kategoria/elektronika"
+    }
+  ],
+  "timestamp": "2025-09-03T..."
+}
+```
+
+### Search Allegro Products (Admin)
+```http
+GET /api/scraping/search?q=opony%20zimowe&limit=10
+Authorization: Bearer <admin_jwt_token>
+```
+
+Response:
+```json
+{
+  "success": true,
+  "data": [
+    {
+      "id": "product-123",
+      "title": "Opony zimowe 205/55R16 Continental",
+      "price": "599,99",
+      "currency": "PLN",
+      "imageUrl": "https://...",
+      "url": "https://allegro.pl/oferta/...",
+      "categoryId": "motoryzacja-opony",
+      "seller": {
+        "name": "OponySklepXYZ"
+      },
+      "condition": "Nowe",
+      "location": "Warszawa"
+    }
+  ],
+  "timestamp": "2025-09-03T..."
+}
+```
+
+### Batch Scraping (Admin)
+```http
+POST /api/scraping/batch-scrape
+Authorization: Bearer <admin_jwt_token>
+Content-Type: application/json
+
+{
+  "searchQueries": ["części BMW", "opony letnie"],
+  "categories": ["https://allegro.pl/kategoria/motoryzacja"],
+  "limit": 20
 }
 ```
 

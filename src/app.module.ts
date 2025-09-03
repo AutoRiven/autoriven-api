@@ -6,7 +6,12 @@ import { AuthModule } from './auth/auth.module';
 import { UsersModule } from './users/users.module';
 import { SearchModule } from './search/search.module';
 import { HealthModule } from './health/health.module';
+import { ScrapingModule } from './scraping/scraping.module';
+import { ProductsModule } from './products/products.module';
 import { User } from './users/entities/user.entity';
+import { Category } from './products/entities/category.entity';
+import { Subcategory } from './products/entities/subcategory.entity';
+import { Product } from './products/entities/product.entity';
 
 @Module({
   imports: [
@@ -26,7 +31,7 @@ import { User } from './users/entities/user.entity';
         username: configService.get('DATABASE_USERNAME'),
         password: configService.get('DATABASE_PASSWORD'),
         database: configService.get('DATABASE_NAME'),
-        entities: [User],
+        entities: [User, Category, Subcategory, Product],
         synchronize: configService.get('NODE_ENV') === 'development',
         logging: configService.get('NODE_ENV') === 'development',
       }),
@@ -49,8 +54,10 @@ import { User } from './users/entities/user.entity';
     // Feature modules
     AuthModule,
     UsersModule,
+    ProductsModule,
     SearchModule,
     HealthModule,
+    ScrapingModule,
   ],
 })
 export class AppModule {}

@@ -1,26 +1,25 @@
 # AutoRiven API
 
-A robust NestJS backend API with PostgreSQL database and Elasticsearch integration for the AutoRiven platform.
+A clean, optimized NestJS backend API with PostgreSQL database and live Allegro.pl category scraping for automotive parts.
 
 ## Features
 
 - **Authentication & Authorization**
   - JWT-based authentication
-  - Two user roles: Administrator and Customer
+  - Role-based access control (Administrator, Customer)
   - Secure password hashing with bcrypt
-  - Protected routes with guards
 
 - **Database Integration**
   - PostgreSQL with TypeORM
-  - User entity with comprehensive fields
-  - Automatic password hashing
-  - Database migrations support
+  - Automotive category hierarchy
+  - Product management entities
 
-- **Search Functionality**
-  - Elasticsearch integration
-  - Full-text search capabilities
-  - Advanced filtering options
-  - Automatic index management
+- **Live Scraping (Allegro.pl)**
+  - Real-time category extraction from Allegro.pl
+  - 187+ automotive categories with hierarchy
+  - Anti-bot protection bypass with scrape.do proxy
+  - Polish to English translation
+  - Automatic result export to JSON
 
 - **API Features**
   - RESTful API design
@@ -36,6 +35,7 @@ A robust NestJS backend API with PostgreSQL database and Elasticsearch integrati
 - Node.js (v16 or higher)
 - PostgreSQL (v12 or higher)
 - Elasticsearch (v8.0 or higher)
+- Scrape.do API token (for web scraping)
 
 ### Installation
 
@@ -101,6 +101,15 @@ The API will be available at `http://localhost:3000/api`
 ### Search
 - `GET /api/search/users` - Search users with filters (Admin only)
 
+### Web Scraping (Allegro.pl)
+- `GET /api/scraping/health` - Scraping service health check (Admin only)
+- `GET /api/scraping/categories` - Scrape Allegro categories (Admin only)
+- `GET /api/scraping/categories/:categoryUrl/subcategories` - Scrape subcategories (Admin only)
+- `GET /api/scraping/products` - Scrape products from category (Admin only)
+- `GET /api/scraping/search` - Search products on Allegro (Admin only)
+- `GET /api/scraping/product/:productUrl` - Get detailed product info (Admin only)
+- `POST /api/scraping/batch-scrape` - Batch scraping operation (Admin only)
+
 ## User Roles
 
 ### Administrator
@@ -128,6 +137,7 @@ The API will be available at `http://localhost:3000/api`
 | `ELASTICSEARCH_NODE` | Elasticsearch URL | `http://localhost:9200` |
 | `ELASTICSEARCH_USERNAME` | Elasticsearch username | - |
 | `ELASTICSEARCH_PASSWORD` | Elasticsearch password | - |
+| `SCRAPE_DO_TOKEN` | Scrape.do API token | - |
 | `PORT` | Application port | `3000` |
 | `NODE_ENV` | Environment mode | `development` |
 | `CORS_ORIGIN` | CORS allowed origin | `http://localhost:5173` |

@@ -5,7 +5,8 @@ import {
   CreateDateColumn, 
   UpdateDateColumn,
   ManyToOne,
-  JoinColumn
+  JoinColumn,
+  OneToMany
 } from 'typeorm';
 import { Category } from './category.entity';
 import { Subcategory } from './subcategory.entity';
@@ -76,6 +77,13 @@ export class Product {
 
   @Column({ nullable: true })
   subcategoryId: string;
+
+  // Relationships
+  @OneToMany('OrderItem', 'product')
+  orderItems: any[];
+
+  @OneToMany('Review', 'product')
+  reviews: any[];
 
   @CreateDateColumn()
   createdAt: Date;
