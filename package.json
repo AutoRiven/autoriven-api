@@ -17,7 +17,10 @@
     "schema:sync": "typeorm-ts-node-commonjs schema:sync -d src/database/data-source.ts",
     "seed:categories": "ts-node src/database/seeders/category.seeder.ts",
     "lint": "eslint \"{src,apps,libs}/**/*.ts\" --fix",
-    "scrape:categories": "ts-node scripts/scrape-categories.ts"
+    "scrape:categories": "ts-node scripts/scrape-categories.ts",
+    "scrape:simple": "ts-node scripts/simple-scrape-categories.ts",
+    "scrape:mock": "ts-node scripts/mock-scrape-categories.ts",
+    "scrape:direct": "ts-node scripts/direct-scrape-categories.ts"
   },
   "repository": {
     "type": "git",
@@ -62,7 +65,6 @@
   "devDependencies": {
     "@nestjs/cli": "^10.0.0",
     "@nestjs/schematics": "^10.0.0",
-    "@types/axios": "^0.9.36",
     "@types/bcryptjs": "^2.4.2",
     "@types/node": "^20.19.11",
     "@types/passport-jwt": "^3.0.9",

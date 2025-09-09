@@ -4,11 +4,6 @@ import { User } from '../users/entities/user.entity';
 import { Category } from '../products/entities/category.entity';
 import { Subcategory } from '../products/entities/subcategory.entity';
 import { Product } from '../products/entities/product.entity';
-import { Order } from '../orders/entities/order.entity';
-import { OrderItem } from '../orders/entities/order-item.entity';
-import { Payment } from '../payments/entities/payment.entity';
-import { Review } from '../reviews/entities/review.entity';
-import { Notification } from '../notifications/entities/notification.entity';
 
 config();
 
@@ -26,11 +21,6 @@ const AppDataSource = new DataSource({
     Category,
     Subcategory,
     Product,
-    Order,
-    OrderItem,
-    Payment,
-    Review,
-    Notification,
   ],
   migrations: ['src/database/migrations/*.ts'],
   subscribers: ['src/**/*.subscriber.ts'],

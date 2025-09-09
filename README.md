@@ -1,241 +1,639 @@
 # AutoRiven API
 
-A clean, optimized NestJS backend API with PostgreSQL database and live Allegro.pl category scraping for automotive parts.
+A comprehensive NestJS-based backend application for automotive e-commerce, featuring advanced web scraping capabilities, PostgreSQL database integration, and Elasticsearch search functionality.
 
-## Features
+## 🚀 Features
 
-- **Authentication & Authorization**
-  - JWT-based authentication
-  - Role-based access control (Administrator, Customer)
-  - Secure password hashing with bcrypt
+- **Web Scraping**: Advanced Allegro.pl category and product scraping with proxy support
+- **Database**: PostgreSQL with TypeORM for data persistence  
+- **Search**: Elasticsearch integration for fast product search
+- **Authentication**: JWT-based authentication with role-based access control
+- **API**: RESTful API endpoints for all core functionality
+- **Health Checks**: Built-in health monitoring
+- **Data Seeding**: Automated database seeding for categories and initial data
 
-- **Database Integration**
-  - PostgreSQL with TypeORM
-  - Automotive category hierarchy
-  - Product management entities
-
-- **Live Scraping (Allegro.pl)**
-  - Real-time category extraction from Allegro.pl
-  - 187+ automotive categories with hierarchy
-  - Anti-bot protection bypass with scrape.do proxy
-  - Polish to English translation
-  - Automatic result export to JSON
-
-- **API Features**
-  - RESTful API design
-  - Input validation with class-validator
-  - Data transformation with class-transformer
-  - Global error handling
-  - CORS configuration
-
-## Getting Started
-
-### Prerequisites
+## 📋 Prerequisites
 
 - Node.js (v16 or higher)
-- PostgreSQL (v12 or higher)
-- Elasticsearch (v8.0 or higher)
-- Scrape.do API token (for web scraping)
+- PostgreSQL (v12 or higher) 
+- Elasticsearch (v8 or higher)
+- npm package manager
 
-### Installation
+## 🛠️ Installation & Setup
 
-1. Clone the repository:
-   ```bash
-   git clone https://github.com/AutoRiven/autoriven-api.git
-   cd autoriven-api
-   ```
+### 1. Clone and Install
+```bash
+git clone https://github.com/AutoRiven/autoriven-api.git
+cd autoriven-api
+npm install
+```
 
-2. Install dependencies:
-   ```bash
-   npm install
-   ```
+### 2. Environment Configuration
+Copy the environment example file and configure:
+```bash
+cp .env.example .env
+```
 
-3. Set up environment variables:
-   ```bash
-   cp .env.example .env
-   ```
-   
-   Update the `.env` file with your database and Elasticsearch configurations.
+Configure your `.env` file:
+```env
+# Database Configuration
+DATABASE_HOST=localhost
+DATABASE_PORT=5432
+DATABASE_USERNAME=postgres
+DATABASE_PASSWORD=your_password
+DATABASE_NAME=autoriven_db
 
-4. Start PostgreSQL and Elasticsearch services.
+# Elasticsearch Configuration  
+ELASTICSEARCH_NODE=http://localhost:9200
+ELASTICSEARCH_USERNAME=elastic
+ELASTICSEARCH_PASSWORD=your_elasticsearch_password
 
-5. Run database migrations (if any):
-   ```bash
-   npm run migration:run
-   ```
+# JWT Configuration
+JWT_SECRET=your_super_secret_jwt_key
+JWT_EXPIRES_IN=24h
 
-### Running the Application
+# Scraping Configuration
+SCRAPE_DO_TOKEN=your_scrape_do_proxy_token
 
-#### Development Mode
+# Application
+NODE_ENV=development
+PORT=3000
+```
+
+### 3. Database Setup
+```bash
+# Run database migrations
+npm run migration:run
+
+# Seed initial data (creates admin user)
+npm run seed
+```
+
+### 4. Start Application
+```bash
+# Development mode
+npm run start:dev
+
+# Production mode  
+npm run build
+npm run start:prod
+```
+
+## 📁 Project Structure
+
+```
+src/
+├── auth/                 # Authentication & authorization
+│   ├── decorators/      # Custom decorators (roles, current user)
+│   ├── dto/            # Auth DTOs (login, register)
+│   ├── guards/         # Guards (JWT, local, roles)
+│   └── strategies/     # Passport strategies (JWT, local)
+├── database/           # Database configuration & seeding
+│   ├── migrations/     # TypeORM migrations
+│   └── seeders/       # Database seeders
+├── health/            # Health check endpoints
+├── products/          # Product & category entities
+│   ├── entities/      # TypeORM entities (Category, Product, Subcategory)
+│   └── services/      # Business logic services
+├── scraping/          # Web scraping functionality
+│   ├── interfaces/    # TypeScript interfaces
+│   └── utils/         # HTTP client & translation utilities
+├── search/            # Elasticsearch search functionality
+└── users/             # User management
+    ├── dto/           # User DTOs
+    └── entities/      # User entity
+```
+
+## 🔧 Available Scripts
+
+| Script | Description |
+|--------|-------------|
+| `npm run build` | Build the application |
+| `npm run start` | Start production server |
+| `npm run start:dev` | Start development server with hot reload |
+| `npm run start:debug` | Start with debugging enabled |
+| `npm run seed` | Run database seeder |
+| `npm run migration:generate` | Generate new migration |
+| `npm run migration:run` | Run pending migrations |
+| `npm run migration:revert` | Revert last migration |
+| `npm run scrape:categories` | Run category scraping script |
+| `npm run lint` | Run ESLint |
+| `npm run format` | Format code with Prettier |
+
+## 🌐 API Endpoints
+
+### Authentication
+- `POST /auth/register` - Register new user
+- `POST /auth/login` - User login
+- `GET /auth/profile` - Get user profile (authenticated)
+
+### Scraping (Admin only)
+- `GET /scraping/health` - Scraping service health check
+- `POST /scraping/categories` - Start category scraping
+
+### Health
+- `GET /health` - Application health status
+
+### Search
+- Search endpoints for products and categories
+
+## 🗄️ Database Schema
+
+### Key Entities
+
+**User**
+- Authentication and user management
+- Role-based access control (USER, ADMINISTRATOR)
+
+**Category** 
+- Hierarchical category structure
+- Automotive-focused categories from Allegro.pl
+- Multi-level categorization (0-7 levels)
+
+**Subcategory**
+- Extended category hierarchy
+- Self-referencing for deep nesting
+
+**Product**
+- Product information
+- Category associations
+- Elasticsearch integration
+
+## 🔍 Scraping System
+
+The application includes a sophisticated web scraping system for Allegro.pl:
+
+### Features
+- **Proxy Support**: Uses ScrapeOwl proxy service for reliable scraping
+- **Hierarchical Scraping**: Automatically discovers and maps category hierarchies
+- **Automotive Focus**: Specialized scraping for automotive categories
+- **Fallback Handling**: Handles missing categories with predefined fallbacks
+- **Rate Limiting**: Configurable delays to respect target site limits
+
+### Usage
+```bash
+# Run category scraping
+npm run scrape:categories
+```
+
+### Configuration
+Configure scraping in your `.env`:
+```env
+SCRAPE_DO_TOKEN=your_proxy_token
+```
+
+## 🔒 Security
+
+- **JWT Authentication**: Secure token-based authentication
+- **Role-based Access**: Administrator and user roles
+- **Password Hashing**: bcrypt for secure password storage
+- **Guards**: Custom guards for route protection
+
+## 🚀 Deployment
+
+### Development
 ```bash
 npm run start:dev
 ```
 
-#### Production Mode
+### Production  
 ```bash
 npm run build
 npm run start:prod
 ```
 
-The API will be available at `http://localhost:3000/api`
+### Docker (Coming Soon)
+Docker configuration will be added for easy deployment.
 
-## API Endpoints
+## 🛠️ Development
 
-### Authentication
-- `POST /api/auth/login` - User login
-- `POST /api/auth/register` - User registration (Customer role)
-- `GET /api/auth/profile` - Get current user profile
-- `GET /api/auth/admin-check` - Admin access verification
-- `POST /api/auth/create-admin` - Create administrator user (Admin only)
+### Code Quality
+- **ESLint**: Code linting and formatting
+- **Prettier**: Code formatting
+- **TypeScript**: Full TypeScript support
 
-### Users Management
-- `GET /api/users` - Get all users (Admin only)
-- `GET /api/users/:id` - Get user by ID (Admin only)
-- `POST /api/users` - Create new user (Admin only)
-- `PATCH /api/users/:id` - Update user (Admin only)
-- `DELETE /api/users/:id` - Delete user (Admin only)
-- `GET /api/users/administrators` - Get all administrators (Admin only)
-- `GET /api/users/customers` - Get all customers (Admin only)
-- `POST /api/users/administrators` - Create administrator (Admin only)
-
-### Search
-- `GET /api/search/users` - Search users with filters (Admin only)
-
-### Web Scraping (Allegro.pl)
-- `GET /api/scraping/health` - Scraping service health check (Admin only)
-- `GET /api/scraping/categories` - Scrape Allegro categories (Admin only)
-- `GET /api/scraping/categories/:categoryUrl/subcategories` - Scrape subcategories (Admin only)
-- `GET /api/scraping/products` - Scrape products from category (Admin only)
-- `GET /api/scraping/search` - Search products on Allegro (Admin only)
-- `GET /api/scraping/product/:productUrl` - Get detailed product info (Admin only)
-- `POST /api/scraping/batch-scrape` - Batch scraping operation (Admin only)
-
-## User Roles
-
-### Administrator
-- Full access to all endpoints
-- Can manage users (create, read, update, delete)
-- Can create other administrators
-- Can search and filter users
-
-### Customer
-- Access to their own profile
-- Can update their own information
-- Limited access to public endpoints
-
-## Environment Variables
-
-| Variable | Description | Default |
-|----------|-------------|---------|
-| `DATABASE_HOST` | PostgreSQL host | `localhost` |
-| `DATABASE_PORT` | PostgreSQL port | `5432` |
-| `DATABASE_USERNAME` | Database username | - |
-| `DATABASE_PASSWORD` | Database password | - |
-| `DATABASE_NAME` | Database name | `autoriven_db` |
-| `JWT_SECRET` | JWT secret key | - |
-| `JWT_EXPIRATION_TIME` | JWT token expiration | `24h` |
-| `ELASTICSEARCH_NODE` | Elasticsearch URL | `http://localhost:9200` |
-| `ELASTICSEARCH_USERNAME` | Elasticsearch username | - |
-| `ELASTICSEARCH_PASSWORD` | Elasticsearch password | - |
-| `SCRAPE_DO_TOKEN` | Scrape.do API token | - |
-| `PORT` | Application port | `3000` |
-| `NODE_ENV` | Environment mode | `development` |
-| `CORS_ORIGIN` | CORS allowed origin | `http://localhost:5173` |
-
-## Database Schema
-
-### User Entity
-- `id` - UUID primary key
-- `email` - Unique email address
-- `firstName` - User's first name
-- `lastName` - User's last name
-- `password` - Hashed password
-- `role` - User role (administrator/customer)
-- `phone` - Phone number (optional)
-- `address` - Street address (optional)
-- `city` - City (optional)
-- `country` - Country (optional)
-- `postalCode` - Postal code (optional)
-- `isActive` - Account status
-- `emailVerified` - Email verification status
-- `lastLoginAt` - Last login timestamp
-- `createdAt` - Account creation timestamp
-- `updatedAt` - Last update timestamp
-
-## Search Capabilities
-
-The Elasticsearch integration provides:
-
-- **Full-text search** across user fields
-- **Fuzzy matching** for typos and variations
-- **Filtering** by role, status, location
-- **Sorting** options
-- **Pagination** support
-
-### Search Query Examples
-
+### Database Migrations
 ```bash
-# Search users by name
-GET /api/search/users?q=john
+# Generate migration
+npm run migration:generate src/database/migrations/YourMigrationName
 
-# Filter by role
-GET /api/search/users?role=customer
+# Run migrations
+npm run migration:run
 
-# Filter by location
-GET /api/search/users?city=New York&country=USA
-
-# Combined search and filters
-GET /api/search/users?q=john&role=customer&isActive=true
+# Revert migration
+npm run migration:revert
 ```
 
-## Development
+## 📊 Monitoring & Health
 
-### Scripts
+- Health check endpoints for monitoring application status
+- Elasticsearch integration status
+- Database connection monitoring
 
-- `npm run start` - Start application
-- `npm run start:dev` - Start in watch mode
+## 🤝 Contributing
+
+1. Fork the repository
+2. Create your feature branch (`git checkout -b feature/AmazingFeature`)
+3. Commit your changes (`git commit -m 'Add some AmazingFeature'`)
+4. Push to the branch (`git push origin feature/AmazingFeature`)
+5. Open a Pull Request
+
+## 📝 License
+
+This project is licensed under the ISC License.
+
+## 🆘 Support
+
+For support, please create an issue in the GitHub repository or contact the development team.
+
+---
+
+**AutoRiven** - Advanced Automotive E-commerce Solution
+   # JWT Configuration
+   JWT_SECRET=your-super-secret-jwt-key
+   JWT_EXPIRES_IN=7d
+   
+   # Elasticsearch Configuration
+   ELASTICSEARCH_NODE=http://localhost:9200
+   ELASTICSEARCH_USERNAME=elastic
+   ELASTICSEARCH_PASSWORD=your_elastic_password
+   
+   # Scraping Configuration
+   SCRAPE_DO_TOKEN=your_scrape_do_token
+   
+   # Application Configuration
+   NODE_ENV=development
+   PORT=3000
+   ```
+
+## 🗄️ Database Setup
+
+1. **Create PostgreSQL Database**
+   ```sql
+   CREATE DATABASE autoriven_db;
+   CREATE USER autoriven_user WITH PASSWORD 'your_password';
+   GRANT ALL PRIVILEGES ON DATABASE autoriven_db TO autoriven_user;
+   ```
+
+2. **Run Database Migrations**
+   ```bash
+   npm run migration:run
+   ```
+
+3. **Seed Initial Data**
+   ```bash
+   npm run seed
+   npm run seed:categories
+   ```
+
+## 🔍 Elasticsearch Setup
+
+1. **Start Elasticsearch** (using Docker)
+   ```bash
+   docker run -d \
+     --name elasticsearch \
+     -p 9200:9200 \
+     -p 9300:9300 \
+     -e "discovery.type=single-node" \
+     -e "xpack.security.enabled=false" \
+     docker.elastic.co/elasticsearch/elasticsearch:8.11.0
+   ```
+
+2. **Verify Connection**
+   ```bash
+   curl http://localhost:9200
+   ```
+
+## 🚦 Running the Application
+
+### Development Mode
+```bash
+npm run start:dev
+```
+
+### Production Mode
+```bash
+npm run build
+npm run start:prod
+```
+
+### Debug Mode
+```bash
+npm run start:debug
+```
+
+## 📡 API Endpoints
+
+### Authentication
+- `POST /auth/register` - User registration
+- `POST /auth/login` - User login
+- `POST /auth/refresh` - Refresh JWT token
+- `POST /auth/forgot-password` - Password reset request
+- `POST /auth/reset-password` - Password reset
+
+### Users
+- `GET /users/profile` - Get user profile
+- `PUT /users/profile` - Update user profile
+- `GET /users` - List all users (Admin only)
+
+### Products
+- `GET /products` - List products with pagination and filters
+- `GET /products/:id` - Get product details
+- `POST /products` - Create new product (Admin only)
+- `PUT /products/:id` - Update product (Admin only)
+- `DELETE /products/:id` - Delete product (Admin only)
+
+### Categories
+- `GET /categories` - List all categories
+- `GET /categories/:id` - Get category details
+- `GET /categories/:id/products` - Get products in category
+
+### Search
+- `GET /search/products` - Search products
+- `POST /search/index` - Reindex search data (Admin only)
+
+### Scraping
+- `POST /scraping/categories` - Start category scraping (Admin only)
+- `GET /scraping/results/latest` - Get latest scraping results
+- `GET /scraping/health` - Check scraping service health
+
+### Health
+- `GET /health` - Application health check
+
+## 🔧 Available Scripts
+
+### Development
+- `npm run start:dev` - Start in development mode with hot reload
 - `npm run start:debug` - Start in debug mode
-- `npm run build` - Build application
-- `npm run test` - Run tests
-- `npm run test:watch` - Run tests in watch mode
 - `npm run lint` - Run ESLint
+- `npm run format` - Format code with Prettier
 
-### Project Structure
+### Database
+- `npm run migration:generate` - Generate new migration
+- `npm run migration:run` - Run pending migrations
+- `npm run migration:revert` - Revert last migration
+- `npm run schema:sync` - Sync database schema (dev only)
+- `npm run seed` - Run database seeders
+- `npm run seed:categories` - Seed categories specifically
+
+### Scraping
+- `npm run scrape:categories` - Run category scraping script
+
+### Production
+- `npm run build` - Build the application
+- `npm run start:prod` - Start in production mode
+
+## 🕸️ Web Scraping
+
+### Overview
+The application includes a sophisticated web scraping system designed to extract product categories and data from Allegro.pl, Poland's largest e-commerce platform.
+
+### Features
+- **Proxy Support**: Uses scrape.do proxy service for reliable scraping
+- **Rate Limiting**: Built-in request throttling to respect target site
+- **Retry Logic**: Automatic retry with exponential backoff
+- **Deep Hierarchy**: Supports scraping up to 6 levels of category hierarchy
+- **Translation**: Automatic Polish-to-English category translation
+- **Data Validation**: Comprehensive data validation and cleaning
+
+### Configuration
+```typescript
+// Default scraping configuration
+{
+  proxyToken: 'your_scrape_do_token',
+  baseUrl: 'https://allegro.pl',
+  userAgent: 'Mozilla/5.0...',
+  requestDelay: 1000, // 1 second between requests
+  maxRetries: 3,
+}
+```
+
+### Running Scraping
+```bash
+# Run via npm script
+npm run scrape:categories
+
+# Or via API endpoint (Admin required)
+curl -X POST http://localhost:3000/scraping/categories \
+  -H "Authorization: Bearer your_jwt_token"
+```
+
+### Results
+Scraping results are saved to the `results/` directory with timestamps:
+```
+results/
+├── allegro-categories-2025-09-08T08-32-55-683Z.json
+└── allegro-categories-breadcrumb-corrected-2025-09-08T08-44-53-033Z.json
+```
+
+## 🏗️ Project Structure
 
 ```
 src/
 ├── auth/                 # Authentication module
-│   ├── decorators/       # Custom decorators
+│   ├── decorators/      # Custom decorators
 │   ├── dto/             # Data transfer objects
 │   ├── guards/          # Auth guards
 │   └── strategies/      # Passport strategies
-├── users/               # Users module
-│   ├── dto/            # User DTOs
-│   ├── entities/       # User entity
-│   └── ...
-├── search/             # Search module
-│   └── ...
-├── app.module.ts       # Root application module
-└── main.ts            # Application entry point
+├── database/            # Database configuration
+│   ├── migrations/      # TypeORM migrations
+│   └── seeders/         # Database seeders
+├── products/            # Product management
+│   └── entities/        # Product entities
+├── scraping/            # Web scraping module
+│   ├── dto/             # Scraping DTOs
+│   ├── interfaces/      # TypeScript interfaces
+│   └── utils/           # Scraping utilities
+├── search/              # Elasticsearch integration
+├── users/               # User management
+└── health/              # Health check module
+
+scripts/
+└── scrape-categories.ts # Standalone scraping script
+
+results/                 # Scraping results storage
 ```
 
-## Security Considerations
+## 🔐 Authentication & Authorization
 
-- All passwords are hashed using bcrypt
-- JWT tokens are used for authentication
-- Role-based access control (RBAC)
-- Input validation on all endpoints
-- CORS configuration
-- Environment variable protection
+### User Roles
+- **USER**: Basic user with limited access
+- **ADMINISTRATOR**: Full access to all endpoints
+- **MODERATOR**: Extended access for content management
 
-## Contributing
+### Protected Routes
+Most endpoints require authentication. Use the JWT token in the Authorization header:
+```bash
+Authorization: Bearer <your_jwt_token>
+```
+
+### Admin-Only Endpoints
+- All scraping endpoints
+- User management
+- Product creation/modification
+- Search indexing
+
+## 📊 Database Schema
+
+### Core Entities
+- **User**: User accounts and authentication
+- **Category**: Product categories hierarchy
+- **Subcategory**: Category subdivisions
+- **Product**: Product information and metadata
+
+### Relationships
+- Users can have multiple orders
+- Products belong to categories and subcategories
+- Categories form a hierarchical tree structure
+
+## 🔍 Search Functionality
+
+### Elasticsearch Integration
+The application uses Elasticsearch for fast, full-text product search with features:
+- Multi-field search (title, description, specifications)
+- Faceted search (category, price range, brand)
+- Auto-complete suggestions
+- Relevance scoring
+
+### Search API
+```bash
+# Basic search
+GET /search/products?q=brake+pads&category=car-parts
+
+# Advanced search with filters
+GET /search/products?q=oil+filter&minPrice=10&maxPrice=50&brand=bosch
+```
+
+## 🚨 Error Handling
+
+The application implements comprehensive error handling:
+- **Validation Errors**: Detailed field-level validation messages
+- **Authentication Errors**: Clear auth failure responses
+- **Database Errors**: Graceful database error handling
+- **Scraping Errors**: Retry logic with detailed error reporting
+
+## 📈 Monitoring & Health Checks
+
+### Health Endpoints
+- `GET /health` - Overall application health
+- `GET /health/database` - Database connectivity
+- `GET /health/elasticsearch` - Search service status
+- `GET /scraping/health` - Scraping service status
+
+### Logging
+Structured logging with different levels:
+- **Error**: System errors and exceptions
+- **Warn**: Warning conditions
+- **Info**: General information
+- **Debug**: Detailed debug information
+
+## 🔧 Environment Variables
+
+### Required Variables
+```env
+DATABASE_HOST=localhost
+DATABASE_PORT=5432
+DATABASE_USERNAME=postgres
+DATABASE_PASSWORD=your_password
+DATABASE_NAME=autoriven_db
+JWT_SECRET=your-super-secret-jwt-key
+```
+
+### Optional Variables
+```env
+NODE_ENV=development
+PORT=3000
+JWT_EXPIRES_IN=7d
+ELASTICSEARCH_NODE=http://localhost:9200
+SCRAPE_DO_TOKEN=your_token
+```
+
+## 🧪 Testing
+
+### Running Tests
+```bash
+# Unit tests
+npm run test
+
+# E2E tests
+npm run test:e2e
+
+# Test coverage
+npm run test:cov
+```
+
+## 🚀 Deployment
+
+### Production Build
+```bash
+npm run build
+```
+
+### Docker Deployment
+```dockerfile
+FROM node:16-alpine
+WORKDIR /app
+COPY package*.json ./
+RUN npm ci --only=production
+COPY dist ./dist
+EXPOSE 3000
+CMD ["node", "dist/main"]
+```
+
+### Environment Setup
+1. Set `NODE_ENV=production`
+2. Configure production database
+3. Set up Elasticsearch cluster
+4. Configure proxy/load balancer
+5. Set up SSL certificates
+
+## 📝 API Documentation
+
+### Swagger/OpenAPI
+The API documentation is automatically generated and available at:
+```
+http://localhost:3000/api/docs
+```
+
+### Postman Collection
+Import the Postman collection for easy API testing:
+```
+docs/autoriven-api.postman_collection.json
+```
+
+## 🤝 Contributing
 
 1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Add tests for new functionality
-5. Submit a pull request
+2. Create a feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit your changes (`git commit -m 'Add amazing feature'`)
+4. Push to the branch (`git push origin feature/amazing-feature`)
+5. Open a Pull Request
 
-## License
+### Code Style
+- Use TypeScript
+- Follow ESLint configuration
+- Write comprehensive tests
+- Document new features
+- Use conventional commits
 
-This project is licensed under the ISC License.
+## 📄 License
+
+This project is licensed under the ISC License - see the [LICENSE](LICENSE) file for details.
+
+## 🆘 Support
+
+### Documentation
+- [NestJS Documentation](https://docs.nestjs.com)
+- [TypeORM Documentation](https://typeorm.io)
+- [Elasticsearch Documentation](https://www.elastic.co/guide)
+
+### Issues
+For bug reports and feature requests, please use the [GitHub Issues](https://github.com/AutoRiven/autoriven-api/issues) page.
+
+### Contact
+- Email: support@autoriven.com
+- Website: https://autoriven.com
+
+---
+
+**AutoRiven API** - Powering the future of automotive e-commerce 🚗✨

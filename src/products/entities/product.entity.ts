@@ -78,12 +78,12 @@ export class Product {
   @Column({ nullable: true })
   subcategoryId: string;
 
-  // Relationships
-  @OneToMany('OrderItem', 'product')
-  orderItems: any[];
+  // Relationships - commented out until these entities are created
+  // @OneToMany('OrderItem', 'product')
+  // orderItems: any[];
 
-  @OneToMany('Review', 'product')
-  reviews: any[];
+  // @OneToMany('Review', 'product')
+  // reviews: any[];
 
   @CreateDateColumn()
   createdAt: Date;

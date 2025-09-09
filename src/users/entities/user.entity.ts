@@ -65,18 +65,18 @@ export class User {
   @Column({ nullable: true })
   lastLoginAt: Date;
 
-  // Relationships
-  @OneToMany('Order', 'user')
-  orders: any[];
+  // Relationships - commented out until these entities are created
+  // @OneToMany('Order', 'user')
+  // orders: any[];
 
-  @OneToMany('Payment', 'user')
-  payments: any[];
+  // @OneToMany('Payment', 'user')
+  // payments: any[];
 
-  @OneToMany('Review', 'user')
-  reviews: any[];
+  // @OneToMany('Review', 'user')
+  // reviews: any[];
 
-  @OneToMany('Notification', 'user')
-  notifications: any[];
+  // @OneToMany('Notification', 'user')
+  // notifications: any[];
 
   @CreateDateColumn()
   createdAt: Date;
