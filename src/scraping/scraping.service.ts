@@ -5,360 +5,589 @@ import { join } from 'path';
 import { Category, ScrapingConfig, ScrapingResult } from './interfaces/scraping.interface';
 import { ScrapingHttpClient } from './utils/http-client.util';
 import { translateCategory, createSlug } from './utils/translations.util';
+import * as cheerio from 'cheerio';
 
 @Injectable()
 export class ScrapingService {
   private readonly logger = new Logger(ScrapingService.name);
-  private readonly httpClient: ScrapingHttpClient;
   private readonly config: ScrapingConfig;
-  
+  private readonly httpClient: ScrapingHttpClient;
+
   constructor(private configService: ConfigService) {
     this.config = {
-      proxyToken: this.configService.get<string>('SCRAPE_DO_TOKEN', 'b70dd4da53294062b160bb6953ba0619f32185d1508'),
-      baseUrl: 'https://allegro.pl',
-      userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36',
-      requestDelay: 1000,
+      baseUrl: this.configService.get<string>('ALLEGRO_BASE_URL', 'https://allegro.pl'),
+      proxyToken: this.configService.get<string>('SCRAPE_DO_TOKEN'),
+      userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
       maxRetries: 3,
+      requestDelay: 2000,
     };
-    
+
+    if (!this.config.proxyToken) {
+      throw new Error('SCRAPE_DO_TOKEN environment variable is required');
+    }
+
     this.httpClient = new ScrapingHttpClient(this.config);
   }
 
   /**
-   * Main method to scrape all Allegro categories
+   * Main method to scrape automotive categories from Allegro - PURE SCRAPING ONLY
    */
   async scrapeAllCategories(): Promise<ScrapingResult> {
-    this.logger.log('Starting comprehensive category scraping...');
+    this.logger.log('🚗 Starting pure automotive category scraping from Allegro...');
+    
+    // First test proxy connectivity
+    await this.testProxyConnection();
     
     const startTime = new Date();
     const scrapedCategories = new Map<string, Category>();
     
     try {
-      // Start with automotive categories (main focus)
-      await this.scrapeAutomotiveCategories(scrapedCategories);
-      
-      // Extend with other major categories if needed
-      await this.scrapeOtherMainCategories(scrapedCategories);
+      // Start scraping from the base automotive parts category
+      const baseUrl = 'https://allegro.pl/kategoria/czesci-samochodowe-620';
+      await this.scrapeFromBaseCategory(baseUrl, scrapedCategories);
       
       const categories = Array.from(scrapedCategories.values());
       const result: ScrapingResult = {
         scrapedAt: startTime.toISOString(),
         totalCategories: categories.length,
-        method: 'Comprehensive scraping with proxy',
+        method: 'Pure dynamic scraping from Allegro with scrape.do proxy - NO HARDCODED DATA',
         levelBreakdown: this.calculateLevelBreakdown(categories),
         categories,
       };
 
-      // Save results
       this.saveResults(result);
       
-      this.logger.log(`Scraping completed. Found ${categories.length} categories.`);
+      this.logger.log(`✅ Pure scraping completed. Found ${categories.length} categories.`);
       return result;
       
     } catch (error) {
-      this.logger.error('Scraping failed:', error);
+      this.logger.error('❌ Pure scraping failed:', error);
       throw error;
     }
   }
 
   /**
-   * Scrape automotive categories with deep hierarchy
+   * Test proxy connection with a simple request
    */
-  private async scrapeAutomotiveCategories(categoriesMap: Map<string, Category>): Promise<void> {
-    this.logger.log('🚗 Attempting to scrape automotive categories...');
-    
-    const automotiveUrl = `${this.config.baseUrl}/dzial/motoryzacja`;
+  private async testProxyConnection(): Promise<void> {
+    this.logger.log('🔍 Testing proxy connection...');
     
     try {
-      // Try real scraping first with a shorter timeout
-      const response = await this.httpClient.get(automotiveUrl, { timeout: 5000 });
-      const categories = this.extractCategoriesFromPage(response.data, 1);
+      const testUrl = 'https://httpbin.org/get';
+      const response = await this.httpClient.get(testUrl, { timeout: 10000 });
       
-      if (categories && categories.length > 0) {
-        for (const category of categories) {
-          categoriesMap.set(category.allegroId, category);
-          
-          // Recursively scrape subcategories
-          await this.scrapeSubcategories(category, categoriesMap, 2);
-        }
-        
-        this.logger.log(`✅ Successfully scraped ${categories.length} automotive categories`);
-      } else {
-        throw new Error('No categories found in scraped data - page structure may have changed');
+      if (response.status === 200) {
+        this.logger.log('✅ Proxy connection test successful');
+        this.logger.debug(`Response: ${JSON.stringify(response.data)}`);
       }
-      
     } catch (error) {
-      this.logger.warn('Real scraping failed, falling back to curated automotive data:', error.message);
-      
-      // Fallback to curated automotive categories when scraping fails
-      this.generateCuratedAutomotiveCategories(categoriesMap);
+      this.logger.error('❌ Proxy connection test failed:', error.message);
+      throw new Error(`Proxy test failed: ${error.message}. Check your SCRAPE_DO_TOKEN and proxy configuration.`);
     }
   }
 
   /**
-   * Generate curated automotive categories based on real Allegro structure
+   * Scrape categories starting from the base automotive parts URL
    */
-  private generateCuratedAutomotiveCategories(categoriesMap: Map<string, Category>): void {
-    this.logger.log('📋 Generating curated automotive categories...');
+  private async scrapeFromBaseCategory(baseUrl: string, categoriesMap: Map<string, Category>): Promise<void> {
+    this.logger.log(`🎯 Starting dynamic scraping from base URL: ${baseUrl}`);
     
-    // Main automotive category
-    const mainCategory: Category = {
-      id: '19453',
-      name: 'Motoryzacja',
-      nameEn: 'Automotive',
-      slug: 'motoryzacja',
-      url: 'https://allegro.pl/kategoria/motoryzacja-19453',
-      level: 1,
-      parentId: null,
-      allegroId: '19453',
-      hasProducts: true,
-      productCount: 125000
-    };
-    
-    categoriesMap.set(mainCategory.allegroId, mainCategory);
-    
-    // Curated subcategories based on real Allegro automotive structure
-    const subcategories = [
-      { allegroId: '19454', name: 'Części samochodowe', nameEn: 'Car Parts', productCount: 85000 },
-      { allegroId: '19455', name: 'Opony i felgi', nameEn: 'Tires and Wheels', productCount: 25000 },
-      { allegroId: '19456', name: 'Akcesoria samochodowe', nameEn: 'Car Accessories', productCount: 18000 },
-      { allegroId: '19457', name: 'Silniki i osprzęt', nameEn: 'Engines and Equipment', productCount: 12000 },
-      { allegroId: '19458', name: 'Układ hamulcowy', nameEn: 'Brake System', productCount: 8500 },
-      { allegroId: '19459', name: 'Układ elektryczny', nameEn: 'Electrical System', productCount: 11000 },
-      { allegroId: '19460', name: 'Karoseria', nameEn: 'Body Parts', productCount: 22000 },
-      { allegroId: '19461', name: 'Wnętrze samochodu', nameEn: 'Car Interior', productCount: 7200 },
-      { allegroId: '19462', name: 'Tuning', nameEn: 'Tuning', productCount: 5800 },
-      { allegroId: '19463', name: 'Narzędzia i chemia', nameEn: 'Tools and Chemicals', productCount: 9200 },
-      { allegroId: '19464', name: 'Oleje i płyny', nameEn: 'Oils and Fluids', productCount: 6500 },
-      { allegroId: '19465', name: 'Filtry', nameEn: 'Filters', productCount: 4800 },
-      { allegroId: '19466', name: 'Zawieszenie', nameEn: 'Suspension', productCount: 7800 },
-      { allegroId: '19467', name: 'Układ wydechowy', nameEn: 'Exhaust System', productCount: 5200 },
-      { allegroId: '19468', name: 'Klimatyzacja', nameEn: 'Air Conditioning', productCount: 3900 }
-    ];
-    
-    for (const subcat of subcategories) {
-      const category: Category = {
-        id: subcat.allegroId,
-        name: subcat.name,
-        nameEn: subcat.nameEn,
-        slug: createSlug(subcat.name),
-        url: `https://allegro.pl/kategoria/${createSlug(subcat.name)}-${subcat.allegroId}`,
-        level: 2,
-        parentId: mainCategory.allegroId,
-        allegroId: subcat.allegroId,
+    try {
+      // Scrape the base category page
+      const response = await this.httpClient.get(baseUrl);
+      
+      // Extract base category info from URL
+      const baseIdMatch = baseUrl.match(/\/kategoria\/.*-(\d+)/);
+      if (!baseIdMatch || !baseIdMatch[1]) {
+        throw new Error('Could not extract category ID from base URL');
+      }
+      
+      const baseId = baseIdMatch[1];
+      const baseSlugMatch = baseUrl.match(/\/kategoria\/([^-]+)/);
+      const baseSlug = baseSlugMatch ? baseSlugMatch[1] : 'czesci-samochodowe';
+      
+      // Extract the category name from page content
+      const $ = cheerio.load(response.data);
+      let categoryName = 'Części samochodowe';
+      
+      // Try different selectors to get the page title/category name
+      const titleSelectors = [
+        'h1',
+        '.category-title',
+        '.page-title', 
+        '[data-role="category-title"]',
+        'title'
+      ];
+      
+      for (const selector of titleSelectors) {
+        const titleElement = $(selector).first();
+        if (titleElement.length > 0) {
+          const titleText = titleElement.text().trim();
+          if (titleText && titleText.length > 0 && !titleText.toLowerCase().includes('allegro')) {
+            categoryName = this.cleanCategoryName(titleText);
+            break;
+          }
+        }
+      }
+      
+      // Create the base category
+      const baseCategory: Category = {
+        id: baseId,
+        name: categoryName,
+        nameEn: translateCategory(categoryName),
+        slug: baseSlug,
+        url: baseUrl,
+        level: 1,
+        parentId: null,
+        allegroId: baseId,
         hasProducts: true,
-        productCount: subcat.productCount
+        productCount: this.extractProductCount(response.data)
       };
       
-      categoriesMap.set(category.allegroId, category);
-    }
-    
-    this.logger.log(`✅ Generated ${subcategories.length + 1} curated automotive categories`);
-  }
-
-  /**
-   * Recursively scrape subcategories
-   */
-  private async scrapeSubcategories(
-    parentCategory: Category,
-    categoriesMap: Map<string, Category>,
-    level: number,
-    maxLevel = 6
-  ): Promise<void> {
-    if (level > maxLevel) return;
-    
-    try {
-      const response = await this.httpClient.get(parentCategory.url);
-      const subcategories = this.extractCategoriesFromPage(response.data, level, parentCategory.id);
+      categoriesMap.set(baseCategory.allegroId, baseCategory);
+      this.logger.log(`✅ Added base category: ${baseCategory.name} (ID: ${baseCategory.allegroId})`);
       
-      // Special handling for suspension tuning category
-      if (parentCategory.allegroId === '255624') {
-        await this.addSuspensionTuningSubcategories(categoriesMap);
-      }
+      // Extract level 2 categories (main subcategories like "części karoserii", "oświetlenie", etc.)
+      const level2Categories = this.extractMainSubcategories(response.data, baseCategory.allegroId);
+      this.logger.log(`📋 Found ${level2Categories.length} level 2 main subcategories`);
       
-      for (const subcategory of subcategories) {
-        if (!categoriesMap.has(subcategory.allegroId)) {
-          categoriesMap.set(subcategory.allegroId, subcategory);
-          
-          // Continue recursively
-          await this.scrapeSubcategories(subcategory, categoriesMap, level + 1, maxLevel);
+      // First, add ALL level 2 categories to the map without processing their subcategories
+      this.logger.log(`📥 Adding all ${level2Categories.length} level 2 categories to map first...`);
+      for (const level2Category of level2Categories) {
+        if (!categoriesMap.has(level2Category.allegroId)) {
+          categoriesMap.set(level2Category.allegroId, level2Category);
+          this.logger.log(`✅ Added level 2 category: ${level2Category.name} (ID: ${level2Category.allegroId})`);
+        } else {
+          this.logger.debug(`⏭️  Skipping duplicate level 2 category: ${level2Category.name} (ID: ${level2Category.allegroId})`);
         }
       }
       
-      // Add delay between requests
-      await this.sleep(this.config.requestDelay);
+      // Then process their subcategories
+      this.logger.log(`🔄 Now processing subcategories for all level 2 categories...`);
+      for (let i = 0; i < level2Categories.length; i++) {
+        const level2Category = level2Categories[i];
+        this.logger.log(`🔄 Processing subcategories for level 2 category ${i + 1}/${level2Categories.length}: ${level2Category.name}`);
+        
+        try {
+          // Scrape level 3 categories (specific part categories like "błotniki", "dachy", etc.)
+          await this.scrapeLevel3Categories(level2Category, categoriesMap);
+          await this.sleep(this.config.requestDelay);
+          this.logger.debug(`✅ Completed processing level 3 for: ${level2Category.name}`);
+        } catch (subError) {
+          this.logger.warn(`❌ Failed to scrape level 3 for ${level2Category.name}:`, subError.message);
+          this.logger.warn(`❌ Error details:`, subError.stack);
+          // Continue with next category instead of breaking
+        }
+      }
+      
+      this.logger.log(`✅ Completed scraping from base category. Total categories: ${categoriesMap.size}`);
       
     } catch (error) {
-      this.logger.warn(`Failed to scrape subcategories for ${parentCategory.name}:`, error.message);
-      
-      // For critical categories, add fallback data
-      if (parentCategory.allegroId === '255624') {
-        this.logger.log('Adding fallback suspension tuning subcategories...');
-        await this.addSuspensionTuningSubcategories(categoriesMap);
-      }
+      this.logger.error(`❌ Failed to scrape from base category ${baseUrl}:`, error.message);
+      throw error;
     }
   }
 
   /**
-   * Add suspension tuning subcategories (fallback method)
+   * Extract main subcategories (level 2) - focusing on main automotive parts categories
    */
-  private async addSuspensionTuningSubcategories(categoriesMap: Map<string, Category>): Promise<void> {
-    const suspensionSubcategories = [
-      { id: '255625', name: 'Sprężyny tuningowe', nameEn: 'Tuning Springs' },
-      { id: '255626', name: 'Amortyzatory tuningowe', nameEn: 'Tuning Shock Absorbers' },
-      { id: '255627', name: 'Stabilizatory tuningowe', nameEn: 'Tuning Stabilizers' },
-      { id: '255628', name: 'Zestawy zawieszenia tuningowego', nameEn: 'Tuning Suspension Kits' },
-      { id: '322227', name: 'Drążki stabilizatora', nameEn: 'Stabilizer Links' },
-      { id: '322228', name: 'Wahacze tuningowe', nameEn: 'Tuning Control Arms' },
-      { id: '322230', name: 'Tarcze hamulcowe tuningowe', nameEn: 'Tuning Brake Discs' },
-      { id: '322231', name: 'Klocki hamulcowe tuningowe', nameEn: 'Tuning Brake Pads' },
-      { id: '322232', name: 'Przewody hamulcowe tuningowe', nameEn: 'Tuning Brake Lines' },
-      { id: '322233', name: 'Zaciski hamulcowe tuningowe', nameEn: 'Tuning Brake Calipers' },
-      { id: '322234', name: 'Układy hamulcowe Big Brake', nameEn: 'Big Brake Systems' },
-      { id: '322235', name: 'Płyny i smary tuningowe', nameEn: 'Tuning Fluids and Lubricants' },
-    ];
-
-    for (const subcat of suspensionSubcategories) {
-      if (!categoriesMap.has(subcat.id)) {
-        const category: Category = {
-          id: `category-${subcat.id}`,
-          name: subcat.name,
-          nameEn: subcat.nameEn,
-          slug: createSlug(subcat.name),
-          url: `${this.config.baseUrl}/kategoria/tuning-mechaniczny-uklad-zawieszenia-${createSlug(subcat.name)}-${subcat.id}`,
-          level: 4,
-          parentId: 'category-255624',
-          allegroId: subcat.id,
-          hasProducts: true,
-        };
-        
-        categoriesMap.set(subcat.id, category);
-        this.logger.debug(`Added fallback suspension subcategory: ${subcat.name} (${subcat.id})`);
-      }
-    }
-  }
-
-  /**
-   * Extract categories from HTML page
-   */
-  private extractCategoriesFromPage(html: string, level: number, parentId?: string): Category[] {
+  private extractMainSubcategories(html: string, parentId: string): Category[] {
+    const $ = cheerio.load(html);
     const categories: Category[] = [];
     
-    try {
-      // Extract categories from navigation links
-      const linkRegex = /href="\/kategoria\/([^"]+)"/g;
-      const titleRegex = /title="([^"]+)"/g;
-      const nameRegex = />([^<]+)</g;
-      
-      let linkMatch;
-      const links: string[] = [];
-      
-      while ((linkMatch = linkRegex.exec(html)) !== null) {
-        if (linkMatch[1] && linkMatch[1].includes('-')) {
-          links.push(linkMatch[1]);
-        }
-      }
-      
-      // Extract category data from JSON embedded in page
-      const jsonRegex = /"categories":\s*(\[[^\]]+\])/g;
-      const jsonMatch = jsonRegex.exec(html);
-      
-      if (jsonMatch) {
-        try {
-          const categoriesData = JSON.parse(jsonMatch[1]);
+    // Use the exact selectors from the live Allegro HTML structure
+    const selectors = [
+      // Primary selector for the subcategories list
+      'ul#links-list-Categories li[data-role="LinkItem"] a[data-role="LinkItemAnchor"]',
+      // Fallback selectors for categories section
+      'div[data-role="Categories"] a[href*="/kategoria/czesci-samochodowe-"]',
+      'section a[href*="/kategoria/czesci-samochodowe-"]',
+      // Generic fallback
+      'a[href*="/kategoria/czesci-samochodowe-"]'
+    ];
+    
+    const foundLinks = new Set<string>();
+    
+    // Expected main automotive subcategories from the live HTML
+    const expectedCategories = [
+      'Części karoserii', 'Filtry', 'Oświetlenie', 'Silniki i osprzęt',
+      'Układ chłodzenia silnika', 'Układ elektryczny, zapłon', 'Układ hamulcowy',
+      'Układ kierowniczy', 'Układ klimatyzacji', 'Układ napędowy',
+      'Układ paliwowy', 'Układ pneumatyczny', 'Układ wentylacji',
+      'Układ wydechowy', 'Układ zawieszenia', 'Wycieraczki i spryskiwacze',
+      'Wyposażenie wnętrza', 'Ogrzewanie postojowe i chłodnictwo samochodowe',
+      'Tuning mechaniczny', 'Wyposażenie i chemia OE', 'Pozostałe'
+    ];
+    
+    for (const selector of selectors) {
+      try {
+        $(selector).each((_, element) => {
+          const $link = $(element);
+          const href = $link.attr('href');
+          const text = $link.text().trim();
           
-          for (const catData of categoriesData) {
-            const allegroId = this.extractAllegroId(catData.url || catData.href);
-            if (allegroId) {
-              const category: Category = {
-                id: `category-${allegroId}`,
-                name: catData.name || catData.title || '',
-                nameEn: translateCategory(catData.name || catData.title || ''),
-                slug: createSlug(catData.name || catData.title || ''),
-                url: catData.url || catData.href || '',
-                level,
-                parentId,
-                allegroId,
-                hasProducts: true,
-                productCount: catData.productCount || 0,
-              };
+          if (href && text && href.includes('/kategoria/czesci-samochodowe-') && !foundLinks.has(href)) {
+            foundLinks.add(href);
+            
+            // Extract category ID from URL using the pattern from live HTML
+            const idMatch = href.match(/\/kategoria\/czesci-samochodowe-.*?-(\d+)$/);
+            if (idMatch && idMatch[1]) {
+              const allegroId = idMatch[1];
+              const categoryName = this.cleanCategoryName(text);
               
-              categories.push(category);
+              // Check if this is one of the expected main subcategories
+              const isExpectedCategory = allegroId !== parentId && 
+                categoryName.length > 3 && 
+                (expectedCategories.some(expected => 
+                  categoryName.toLowerCase().includes(expected.toLowerCase()) ||
+                  expected.toLowerCase().includes(categoryName.toLowerCase())
+                ) || href.includes('czesci-samochodowe-'));
+              
+              if (isExpectedCategory) {
+                const category: Category = {
+                  id: allegroId,
+                  name: categoryName,
+                  nameEn: translateCategory(categoryName),
+                  slug: createSlug(categoryName),
+                  url: href.startsWith('http') ? href : `${this.config.baseUrl}${href}`,
+                  level: 2,
+                  parentId,
+                  allegroId,
+                  hasProducts: true,
+                  productCount: this.extractProductCountFromLink($link)
+                };
+                
+                categories.push(category);
+                this.logger.debug(`✅ Found level 2 category: ${categoryName} (${allegroId})`);
+              }
             }
           }
-        } catch (parseError) {
-          this.logger.warn('Failed to parse JSON categories:', parseError);
-        }
+        });
+      } catch (error) {
+        this.logger.debug(`Error with selector ${selector}:`, error.message);
       }
+    }
+    
+    // If we didn't find enough categories with the structured approach, try data attributes approach
+    if (categories.length < 15) {
+      this.logger.warn(`Only found ${categories.length} level 2 categories, trying data attributes approach...`);
       
-      // Fallback: extract from breadcrumb data
-      if (categories.length === 0) {
-        const breadcrumbRegex = /data-analytics-click-custom-navigation-category-id="(\d+)"/g;
-        const nameRegex2 = /<span[^>]*itemprop="name"[^>]*>([^<]+)</g;
-        
-        let breadcrumbMatch;
-        const breadcrumbIds: string[] = [];
-        const breadcrumbNames: string[] = [];
-        
-        while ((breadcrumbMatch = breadcrumbRegex.exec(html)) !== null) {
-          breadcrumbIds.push(breadcrumbMatch[1]);
-        }
-        
-        let nameMatch;
-        while ((nameMatch = nameRegex2.exec(html)) !== null) {
-          breadcrumbNames.push(nameMatch[1].trim());
-        }
-        
-        // Create categories from breadcrumb data
-        for (let i = 0; i < Math.min(breadcrumbIds.length, breadcrumbNames.length); i++) {
-          const allegroId = breadcrumbIds[i];
-          const name = breadcrumbNames[i];
+      try {
+        $('a[data-custom-params]').each((_, element) => {
+          const $link = $(element);
+          const href = $link.attr('href');
+          const customParams = $link.attr('data-custom-params');
           
-          if (allegroId && name && allegroId !== '0') {
-            const category: Category = {
-              id: `category-${allegroId}`,
-              name,
-              nameEn: translateCategory(name),
-              slug: createSlug(name),
-              url: `${this.config.baseUrl}/kategoria/${createSlug(name)}-${allegroId}`,
-              level: i + 1,
-              parentId: i > 0 ? `category-${breadcrumbIds[i - 1]}` : parentId,
-              allegroId,
-              hasProducts: true,
-            };
+          if (href && customParams && href.includes('/kategoria/czesci-samochodowe-') && !foundLinks.has(href)) {
+            foundLinks.add(href);
             
-            categories.push(category);
+            try {
+              const params = JSON.parse(customParams);
+              if (params.id && params.name) {
+                const allegroId = params.id.toString();
+                const categoryName = this.cleanCategoryName(params.name);
+                
+                if (allegroId !== parentId && categoryName.length > 3) {
+                  const category: Category = {
+                    id: allegroId,
+                    name: categoryName,
+                    nameEn: translateCategory(categoryName),
+                    slug: createSlug(categoryName),
+                    url: href.startsWith('http') ? href : `${this.config.baseUrl}${href}`,
+                    level: 2,
+                    parentId,
+                    allegroId,
+                    hasProducts: true,
+                    productCount: params.count || 0
+                  };
+                  
+                  categories.push(category);
+                  this.logger.debug(`✅ Found level 2 category via data attributes: ${categoryName} (${allegroId})`);
+                }
+              }
+            } catch (parseError) {
+              // Skip invalid JSON
+            }
+          }
+        });
+      } catch (error) {
+        this.logger.debug(`Error with data attributes approach:`, error.message);
+      }
+    }
+    
+    // Remove duplicates and sort
+    const uniqueCategories = categories
+      .filter((category, index, self) => 
+        index === self.findIndex(c => c.allegroId === category.allegroId)
+      )
+      .sort((a, b) => a.name.localeCompare(b.name));
+    
+    this.logger.log(`📋 Extracted ${uniqueCategories.length} main subcategories (level 2). Expected ~22.`);
+    
+    if (uniqueCategories.length < 15) {
+      this.logger.warn(`⚠️  Only found ${uniqueCategories.length} level 2 categories. Expected ~22. May need selector adjustment.`);
+    }
+    
+    return uniqueCategories;
+  }
+
+  /**
+   * Scrape level 3 categories (specific part categories like "błotniki", "dachy", etc.)
+   */
+  private async scrapeLevel3Categories(level2Category: Category, categoriesMap: Map<string, Category>): Promise<void> {
+    this.logger.debug(`🔍 Scraping level 3 categories for: ${level2Category.name}`);
+    
+    try {
+      const response = await this.httpClient.get(level2Category.url);
+      const level3Categories = this.extractSpecificPartCategories(response.data, level2Category.allegroId);
+      
+      this.logger.debug(`Found ${level3Categories.length} level 3 categories for ${level2Category.name}`);
+      
+      for (const level3Category of level3Categories) {
+        if (!categoriesMap.has(level3Category.allegroId)) {
+          categoriesMap.set(level3Category.allegroId, level3Category);
+          this.logger.debug(`✅ Added level 3 category: ${level3Category.name} (ID: ${level3Category.allegroId})`);
+          
+          // Scrape level 4 categories (final specific parts)
+          try {
+            await this.scrapeLevel4Categories(level3Category, categoriesMap);
+            await this.sleep(500); // Shorter delay for level 4
+          } catch (level4Error) {
+            this.logger.debug(`Failed to scrape level 4 for ${level3Category.name}:`, level4Error.message);
           }
         }
       }
       
     } catch (error) {
-      this.logger.warn('Failed to extract categories from page:', error);
+      this.logger.warn(`Failed to scrape level 3 categories for ${level2Category.name}:`, error.message);
+    }
+  }
+
+  /**
+   * Extract specific part categories (level 3) like "błotniki", "dachy", "drzwi", etc.
+   */
+  private extractSpecificPartCategories(html: string, parentId: string): Category[] {
+    const $ = cheerio.load(html);
+    const categories: Category[] = [];
+    
+    // Selectors for specific part categories
+    const selectors = [
+      'a[href*="/kategoria/czesci-karoserii-"]',
+      'a[href*="/kategoria/lampy-"]',
+      'a[href*="/kategoria/czujniki-"]',
+      'a[href*="/kategoria/blok-silnika-"]',
+      'a[href*="/kategoria/elementy-napedu-"]',
+      'a[href*="/kategoria/glowice-"]',
+      'a[href*="/kategoria/chlodnice-"]',
+      'a[href*="/kategoria/centralne-zamki-"]',
+      'a[href*="/kategoria/hamulce-"]',
+      'a[href*="/kategoria/kompresory-"]',
+      'a[href*="/kategoria/uklad-"]',
+      'a[href*="/kategoria/"]'
+    ];
+    
+    const foundLinks = new Set<string>();
+    
+    for (const selector of selectors) {
+      try {
+        $(selector).each((_, element) => {
+          const $link = $(element);
+          const href = $link.attr('href');
+          const text = $link.text().trim();
+          
+          if (href && text && href.includes('/kategoria/') && !foundLinks.has(href)) {
+            foundLinks.add(href);
+            
+            const idMatch = href.match(/\/kategoria\/.*-(\d+)/);
+            if (idMatch && idMatch[1]) {
+              const allegroId = idMatch[1];
+              const categoryName = this.cleanCategoryName(text);
+              
+              if (categoryName && categoryName.length > 3 && allegroId !== parentId) {
+                const category: Category = {
+                  id: allegroId,
+                  name: categoryName,
+                  nameEn: translateCategory(categoryName),
+                  slug: createSlug(categoryName),
+                  url: href.startsWith('http') ? href : `${this.config.baseUrl}${href}`,
+                  level: 3,
+                  parentId,
+                  allegroId,
+                  hasProducts: true,
+                  productCount: this.extractProductCountFromLink($link)
+                };
+                
+                categories.push(category);
+              }
+            }
+          }
+        });
+      } catch (error) {
+        this.logger.debug(`Error with selector ${selector}:`, error.message);
+      }
     }
     
-    return categories;
-  }
-
-  /**
-   * Extract Allegro ID from URL
-   */
-  private extractAllegroId(url: string): string | null {
-    if (!url) return null;
+    const uniqueCategories = categories.filter((category, index, self) => 
+      index === self.findIndex(c => c.allegroId === category.allegroId)
+    );
     
-    const match = url.match(/[\/-](\d+)(?:$|\?)/);
-    return match ? match[1] : null;
+    return uniqueCategories;
   }
 
   /**
-   * Scrape other main categories (optional)
+   * Scrape level 4 categories (final specific parts like "błotniki-błotniki", "błotniki-uszczelki", etc.)
    */
-  private async scrapeOtherMainCategories(categoriesMap: Map<string, Category>): Promise<void> {
-    // Can be extended to scrape other main categories like electronics, home, etc.
-    this.logger.debug('Skipping other main categories for now - focusing on automotive');
+  private async scrapeLevel4Categories(level3Category: Category, categoriesMap: Map<string, Category>): Promise<void> {
+    this.logger.debug(`🔍 Scraping level 4 categories for: ${level3Category.name}`);
+    
+    try {
+      const response = await this.httpClient.get(level3Category.url);
+      const level4Categories = this.extractFinalPartCategories(response.data, level3Category.allegroId);
+      
+      this.logger.debug(`Found ${level4Categories.length} level 4 categories for ${level3Category.name}`);
+      
+      for (const level4Category of level4Categories) {
+        if (!categoriesMap.has(level4Category.allegroId)) {
+          categoriesMap.set(level4Category.allegroId, level4Category);
+          this.logger.debug(`✅ Added level 4 category: ${level4Category.name} (ID: ${level4Category.allegroId})`);
+        }
+      }
+      
+    } catch (error) {
+      this.logger.debug(`Failed to scrape level 4 categories for ${level3Category.name}:`, error.message);
+    }
   }
 
   /**
-   * Calculate level breakdown statistics
+   * Extract final part categories (level 4) - the most specific categories
+   */
+  private extractFinalPartCategories(html: string, parentId: string): Category[] {
+    const $ = cheerio.load(html);
+    const categories: Category[] = [];
+    
+    const selectors = ['a[href*="/kategoria/"]'];
+    const foundLinks = new Set<string>();
+    
+    for (const selector of selectors) {
+      try {
+        $(selector).each((_, element) => {
+          const $link = $(element);
+          const href = $link.attr('href');
+          const text = $link.text().trim();
+          
+          if (href && text && href.includes('/kategoria/') && !foundLinks.has(href)) {
+            foundLinks.add(href);
+            
+            const idMatch = href.match(/\/kategoria\/.*-(\d+)/);
+            if (idMatch && idMatch[1]) {
+              const allegroId = idMatch[1];
+              const categoryName = this.cleanCategoryName(text);
+              
+              if (categoryName && categoryName.length > 3 && allegroId !== parentId) {
+                const category: Category = {
+                  id: allegroId,
+                  name: categoryName,
+                  nameEn: translateCategory(categoryName),
+                  slug: createSlug(categoryName),
+                  url: href.startsWith('http') ? href : `${this.config.baseUrl}${href}`,
+                  level: 4,
+                  parentId,
+                  allegroId,
+                  hasProducts: true,
+                  productCount: this.extractProductCountFromLink($link)
+                };
+                
+                categories.push(category);
+              }
+            }
+          }
+        });
+      } catch (error) {
+        this.logger.debug(`Error with selector ${selector}:`, error.message);
+      }
+    }
+    
+    const uniqueCategories = categories.filter((category, index, self) => 
+      index === self.findIndex(c => c.allegroId === category.allegroId)
+    );
+    
+    return uniqueCategories;
+  }
+
+  /**
+   * Extract product count from page content
+   */
+  private extractProductCount(html: string): number {
+    const $ = cheerio.load(html);
+    
+    // Multiple selectors for product count
+    const countSelectors = [
+      '[data-testid="results-count"]',
+      '[data-role="results-counter"]',
+      '.results-count',
+      '.category-counter',
+      '.product-count',
+      '[data-count]',
+      'span:contains("wyników")',
+      'span:contains("oferuje")',
+      'span:contains("results")',
+      'span:contains("products")'
+    ];
+    
+    for (const selector of countSelectors) {
+      try {
+        const countText = $(selector).text();
+        const countMatch = countText.match(/(\d+[\s\d]*)/);
+        if (countMatch) {
+          const count = parseInt(countMatch[1].replace(/\s/g, ''), 10);
+          if (!isNaN(count)) {
+            return count;
+          }
+        }
+      } catch (error) {
+        // Continue to next selector
+      }
+    }
+    
+    return 0;
+  }
+
+  /**
+   * Extract product count from a link element
+   */
+  private extractProductCountFromLink($link: cheerio.Cheerio): number {
+    try {
+      // Try to find product count in various formats
+      const text = $link.text();
+      const countMatch = text.match(/\((\d+)\)/);
+      if (countMatch) {
+        return parseInt(countMatch[1], 10);
+      }
+      
+      // Check for data attributes
+      const dataCount = $link.attr('data-count') || $link.attr('data-product-count');
+      if (dataCount) {
+        return parseInt(dataCount, 10);
+      }
+      
+      return 0;
+    } catch (error) {
+      return 0;
+    }
+  }
+
+  /**
+   * Clean category name
+   */
+  private cleanCategoryName(name: string): string {
+    return name
+      .replace(/\s+/g, ' ')
+      .replace(/[^\w\sąćęłńóśźżĄĆĘŁŃÓŚŹŻ-]/g, '')
+      .trim();
+  }
+
+  /**
+   * Calculate level breakdown for result
    */
   private calculateLevelBreakdown(categories: Category[]): Record<string, number> {
     const breakdown: Record<string, number> = {};
@@ -372,7 +601,7 @@ export class ScrapingService {
   }
 
   /**
-   * Save scraping results to file
+   * Save results to JSON file
    */
   private saveResults(result: ScrapingResult): void {
     const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
@@ -381,7 +610,7 @@ export class ScrapingService {
     
     try {
       writeFileSync(filepath, JSON.stringify(result, null, 2));
-      this.logger.log(`Results saved to: ${filepath}`);
+      this.logger.log(`📁 Results saved to: ${filepath}`);
     } catch (error) {
       this.logger.error('Failed to save results:', error);
     }
