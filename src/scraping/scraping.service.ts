@@ -3,8 +3,8 @@ import { ConfigService } from '@nestjs/config';
 import { writeFileSync } from 'fs';
 import { join } from 'path';
 import { Category, ScrapingConfig, ScrapingResult } from './interfaces/scraping.interface';
-import { ScrapingHttpClient } from './utils/http-client.util';
-import { translateCategory, createSlug } from './utils/translations.util';
+import { ScrapingHttpClient } from '../utils/http-client.util';
+import { translateCategory, createSlug } from '../common/translations.util';
 import * as cheerio from 'cheerio';
 
 @Injectable()

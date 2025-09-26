@@ -1,6 +1,6 @@
 import axios from 'axios';
 import { Injectable, Logger } from '@nestjs/common';
-import { ScrapingConfig } from '../interfaces/scraping.interface';
+import { ScrapingConfig } from '../scraping/interfaces/scraping.interface';
 import * as https from 'https';
 
 /**
