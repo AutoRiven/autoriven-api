@@ -126,6 +126,153 @@ export const CATEGORY_TRANSLATIONS: Record<string, string> = {
   'Pompy': 'Pumps',
   'Zawory': 'Valves',
   'Regulatory': 'Regulators',
+  
+  // Additional categories found in scraping data
+  'Tuning mechaniczny': 'Mechanical Tuning',
+  'Układ elektryczny zapłon': 'Electrical System, Ignition',
+  'Układ pneumatyczny': 'Pneumatic System',
+  'Układ wentylacji': 'Ventilation System',
+  'Wyposażenie i chemia OE': 'OE Equipment and Chemistry',
+  'Części blacharskie - Błotniki': 'Body Parts - Fenders',
+  'Części do maszyn i innych pojazdów': 'Parts for Machinery and Other Vehicles',
+  'Części i wyposażenie motocyklowe': 'Motorcycle Parts and Equipment',
+  'Narzędzia i sprzęt warsztatowy': 'Tools and Workshop Equipment',
+  'Inne pojazdy i łodzie': 'Other Vehicles and Boats',
+  'Usługi motoryzacyjne': 'Automotive Services',
+  'Atrapy chłodnicy': 'Radiator Grilles',
+  'Klapy bagażnika': 'Trunk Lids',
+  'Lusterka zewnętrzne': 'External Mirrors',
+  'Osłony przeciwbłotne': 'Mud Guards',
+  'Podłogi': 'Floors',
+  'Słupki': 'Pillars',
+  'Ściany panele': 'Wall Panels',
+  'Zestawy części blacharskich': 'Body Parts Sets',
+  'Ciężarowe pow 35 t': 'Trucks Over 35t',
+  'Łada': 'Lada',
+  'Id 4 - Panele sterowania przełączniki': 'Control Panels and Switches',
+  
+  // Additional specific body parts
+  'Dachy': 'Roofs',
+  'Progi': 'Thresholds',
+  'Zderzaki przednie': 'Front Bumpers',
+  'Zderzaki tylne': 'Rear Bumpers',
+  
+  // Wiper and washer system
+  'Wycieraczki i spryskiwacze': 'Wipers and Washers',
+  
+  // Additional missing translations from validation
+  'Boczki bagażnika': 'Trunk Side Panels',
+  'Części kabiny kierowcy': 'Driver Cabin Parts',
+  'Elementy mocujące': 'Mounting Elements',
+  'Gałki i mieszki': 'Knobs and Bellows',
+  'Klamki wewnętrzne': 'Interior Handles',
+  'Lusterka wewnętrzne': 'Interior Mirrors',
+  'Mocowanie koła zapasowego': 'Spare Wheel Mounting',
+  'Osłony zaślepki': 'Cover Plugs',
+  'Osłony przeciwsłoneczne': 'Sun Visors',
+  'Oświetlenie kabiny': 'Cabin Lighting',
+  'Panele drzwiowe': 'Door Panels',
+  'Rolety': 'Roller Blinds',
+  'Schowki': 'Compartments',
+  'Uchwyty': 'Holders',
+  'Zamki centralny': 'Central Locks',
+  'Zespoły': 'Assemblies',
+  'Żarówki': 'Bulbs',
+  'Przepustnice': 'Throttle Bodies',
+  'Kolektory dolotowe': 'Intake Manifolds',
+  'Tłoki': 'Pistons',
+  'Korbowody': 'Connecting Rods',
+  'Wały': 'Shafts',
+  'Łożyska': 'Bearings',
+  'Uszczelnienia': 'Seals',
+  'Śruby': 'Screws',
+  'Nakrętki': 'Nuts',
+  'Podkładki': 'Washers',
+  'Klipsy': 'Clips',
+  'Opaski': 'Clamps',
+  'Przewody hamulcowe': 'Brake Lines',
+  'Przewody paliwowe': 'Fuel Lines',
+  'Przewody chłodzące': 'Cooling Lines',
+  'Węże': 'Hoses',
+  'Łączniki': 'Connectors',
+  'Adaptery': 'Adapters',
+  'Redukcje': 'Reducers',
+  'Kolana': 'Elbows',
+  'Trójniki': 'Tees',
+  'Zawory zwrotne': 'Check Valves',
+  'Zawory bezpieczeństwa': 'Safety Valves',
+  'Manometry': 'Pressure Gauges',
+  'Czujniki temperatury': 'Temperature Sensors',
+  'Czujniki ciśnienia': 'Pressure Sensors',
+  'Przekaźniki': 'Relays',
+  'Bezpieczniki': 'Fuses',
+  'Kable': 'Cables',
+  'Złącza': 'Connectors',
+  'Gniazda': 'Sockets',
+  'Wtyczki': 'Plugs',
+  
+  // Additional interior and misc translations
+  'Pedały': 'Pedals',
+  'Podłokietniki': 'Armrests',
+  'Poszycia słupków': 'Pillar Covers',
+  'Półki tylne': 'Rear Shelves',
+  'Rolety bagażnika': 'Trunk Blinds',
+  'Schowki półki': 'Storage Shelves',
+  'Sprężyny gazowe': 'Gas Springs',
+  'Sprzęt audio fabryczny': 'Factory Audio Equipment',
+  'Tunele środkowe': 'Center Tunnels',
+  'Wykładzina': 'Lining',
+  'Zagłówki': 'Headrests',
+  'Zamki drzwi': 'Door Locks',
+  'Zaczepy': 'Latches',
+  'Zespoły drzwi': 'Door Assemblies',
+  'Zderzaki przednie - części': 'Front Bumper Parts',
+  'Zderzaki tylne - części': 'Rear Bumper Parts',
+  'Wskaźniki': 'Indicators',
+  'Wielofunkcyjne': 'Multifunctional',
+  'Wentylatora': 'Fan',
+  'Wentylatora chłodzenia': 'Cooling Fan',
+  'Węże ssące': 'Suction Hoses',
+  'Węże tłoczne': 'Pressure Hoses',
+  'Wkłady': 'Cartridges',
+  'Wlewu': 'Filler',
+  'Wodne': 'Water',
+  'Wody': 'Water',
+  'Wspomagania kierownicy': 'Power Steering',
+  'Wydechowej': 'Exhaust',
+  'Wyłączniki': 'Switches',
+  'Wymienniki': 'Exchangers',
+  'Wyposażenie kabiny': 'Cabin Equipment',
+  'Wypełnienia': 'Fillers',
+  'Wysięgniki': 'Outriggers',
+  'Zaciski': 'Clamps',
+  'Zaczepi': 'Hooks',
+  'Zaczesalek': 'Combs',
+  'Zadaszenia': 'Canopies',
+  'Zagęszczarki': 'Compactors',
+  'Zahaczenia': 'Hooks',
+  'Zalanego': 'Flooded',
+  'Zamknięcia': 'Closures',
+  'Zasobników': 'Containers',
+  'Zasłony': 'Curtains',
+  'Zasuwy': 'Valves',
+  'Zatyczki': 'Plugs',
+  'Zawiasy': 'Hinges',
+  'Zaworek': 'Valve',
+  'Zblokowane': 'Blocked',
+  'Zęby': 'Teeth',
+  'Zgodność': 'Compatibility',
+  'Zginacze': 'Benders',
+  'Zgłaszacz': 'Reporter',
+  'Zgrzewanych': 'Welded',
+  'Złącza elektryczne': 'Electrical Connectors',
+  'Złączka': 'Coupler',
+  'Złoża': 'Deposits',
+  'Zmywacze': 'Washers',
+  'Zobaczenie': 'Viewing',
+  'Zostaną': 'Will Be',
+  'Zewnętrzne': 'External',
+  'Żarówka': 'Bulb'
 };
 
 /**
@@ -136,7 +283,7 @@ export function translateCategory(polishName: string): string {
 }
 
 /**
- * Create slug from category name
+ * Create slug from category name (Polish version)
  */
 export function createSlug(name: string): string {
   return name
@@ -150,4 +297,21 @@ export function createSlug(name: string): string {
     })
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-+|-+$/g, '');
+}
+
+/**
+ * Create English slug from English category name
+ */
+export function createEnglishSlug(englishName: string): string {
+  return englishName
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+}
+
+/**
+ * Generate AutoRiven shop URL from English slug and AutoRiven ID
+ */
+export function createAutoRivenUrl(englishSlug: string, autoRivenId: number, baseUrl = 'https://autoriven.com'): string {
+  return `${baseUrl}/shop/category/${englishSlug}-${autoRivenId}`;
 }

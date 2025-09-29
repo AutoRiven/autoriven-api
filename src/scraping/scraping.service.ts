@@ -4,7 +4,8 @@ import { writeFileSync } from 'fs';
 import { join } from 'path';
 import { Category, ScrapingConfig, ScrapingResult } from './interfaces/scraping.interface';
 import { ScrapingHttpClient } from '../utils/http-client.util';
-import { translateCategory, createSlug } from '../common/translations.util';
+import { translateCategory, createSlug, createEnglishSlug, createAutoRivenUrl } from '../common/translations.util';
+import { PREDEFINED_CATEGORY_URLS, getCategoryHierarchyFromUrl } from './predefined-categories';
 import * as cheerio from 'cheerio';
 
 @Injectable()
@@ -12,6 +13,14 @@ export class ScrapingService {
   private readonly logger = new Logger(ScrapingService.name);
   private readonly config: ScrapingConfig;
   private readonly httpClient: ScrapingHttpClient;
+  private autoRivenIdCounter = 1000; // Starting AutoRiven ID
+
+  /**
+   * Get next AutoRiven ID and increment counter
+   */
+  private getNextAutoRivenId(): number {
+    return this.autoRivenIdCounter++;
+  }
 
   constructor(private configService: ConfigService) {
     this.config = {
@@ -30,10 +39,15 @@ export class ScrapingService {
   }
 
   /**
-   * Main method to scrape automotive categories from Allegro - PURE SCRAPING ONLY
+   * Main method to scrape automotive categories from Allegro - ENHANCED WITH PREDEFINED CATEGORIES
    */
   async scrapeAllCategories(): Promise<ScrapingResult> {
-    this.logger.log('🚗 Starting pure automotive category scraping from Allegro...');
+    this.logger.log('🚗 Starting enhanced automotive category scraping from Allegro...');
+    this.logger.log(`📋 Using ${PREDEFINED_CATEGORY_URLS.length} predefined category URLs for comprehensive coverage`);
+    
+    // Reset AutoRiven ID counter for each scrape
+    this.autoRivenIdCounter = 1000;
+    this.logger.log(`🔢 AutoRiven ID counter reset to ${this.autoRivenIdCounter}`);
     
     // First test proxy connectivity
     await this.testProxyConnection();
@@ -42,26 +56,51 @@ export class ScrapingService {
     const scrapedCategories = new Map<string, Category>();
     
     try {
-      // Start scraping from the base automotive parts category
+      // Start with dynamic scraping from the base category (without filters for initial scraping)
       const baseUrl = 'https://allegro.pl/kategoria/czesci-samochodowe-620';
       await this.scrapeFromBaseCategory(baseUrl, scrapedCategories);
+      
+      // Now scrape all predefined categories to ensure comprehensive coverage
+      await this.scrapePredefinedCategories(scrapedCategories);
       
       const categories = Array.from(scrapedCategories.values());
       const result: ScrapingResult = {
         scrapedAt: startTime.toISOString(),
         totalCategories: categories.length,
-        method: 'Pure dynamic scraping from Allegro with scrape.do proxy - NO HARDCODED DATA',
+        method: 'Enhanced scraping: Dynamic discovery + Predefined categories with scrape.do proxy + AutoRiven ID assignment (1000+) + English translations',
         levelBreakdown: this.calculateLevelBreakdown(categories),
         categories,
       };
 
       this.saveResults(result);
       
-      this.logger.log(`✅ Pure scraping completed. Found ${categories.length} categories.`);
+      // Log comprehensive statistics
+      const autoRivenIds = categories.map(cat => cat.autoRivenId).sort((a, b) => a - b);
+      const minAutoRivenId = Math.min(...autoRivenIds);
+      const maxAutoRivenId = Math.max(...autoRivenIds);
+      
+      this.logger.log(`✅ Enhanced scraping completed. Found ${categories.length} categories.`);
+      this.logger.log(`🔢 AutoRiven IDs assigned: ${minAutoRivenId} - ${maxAutoRivenId}`);
+      this.logger.log(`📊 Level breakdown with AutoRiven IDs:`);
+      
+      [1, 2, 3, 4].forEach(level => {
+        const levelCats = categories.filter(cat => cat.level === level);
+        if (levelCats.length > 0) {
+          const levelIds = levelCats.map(cat => cat.autoRivenId).sort((a, b) => a - b);
+          const minId = Math.min(...levelIds);
+          const maxId = Math.max(...levelIds);
+          this.logger.log(`   Level ${level}: ${levelCats.length} categories (AutoRiven IDs ${minId}-${maxId})`);
+        }
+      });
+      
+      // Log predefined category coverage
+      const predefinedCount = categories.filter(cat => cat.url && PREDEFINED_CATEGORY_URLS.includes(cat.url.split('?')[0])).length;
+      this.logger.log(`📋 Predefined categories found: ${predefinedCount}/${PREDEFINED_CATEGORY_URLS.length}`);
+      
       return result;
       
     } catch (error) {
-      this.logger.error('❌ Pure scraping failed:', error);
+      this.logger.error('❌ Enhanced scraping failed:', error);
       throw error;
     }
   }
@@ -131,12 +170,17 @@ export class ScrapingService {
       }
       
       // Create the base category
+      const englishName = translateCategory(categoryName);
+      const autoRivenId = this.getNextAutoRivenId();
       const baseCategory: Category = {
         id: baseId,
         name: categoryName,
-        nameEn: translateCategory(categoryName),
+        nameEn: englishName,
         slug: baseSlug,
+        englishSlug: createEnglishSlug(englishName),
         url: baseUrl,
+        englishUrl: createAutoRivenUrl(createEnglishSlug(englishName), autoRivenId),
+        autoRivenId,
         level: 1,
         parentId: null,
         allegroId: baseId,
@@ -145,7 +189,7 @@ export class ScrapingService {
       };
       
       categoriesMap.set(baseCategory.allegroId, baseCategory);
-      this.logger.log(`✅ Added base category: ${baseCategory.name} (ID: ${baseCategory.allegroId})`);
+      this.logger.log(`✅ Added base category: ${baseCategory.name} (Allegro ID: ${baseCategory.allegroId}, AutoRiven ID: ${baseCategory.autoRivenId})`);
       
       // Extract level 2 categories (main subcategories like "części karoserii", "oświetlenie", etc.)
       const level2Categories = this.extractMainSubcategories(response.data, baseCategory.allegroId);
@@ -156,7 +200,7 @@ export class ScrapingService {
       for (const level2Category of level2Categories) {
         if (!categoriesMap.has(level2Category.allegroId)) {
           categoriesMap.set(level2Category.allegroId, level2Category);
-          this.logger.log(`✅ Added level 2 category: ${level2Category.name} (ID: ${level2Category.allegroId})`);
+          this.logger.log(`✅ Added level 2 category: ${level2Category.name} (Allegro ID: ${level2Category.allegroId}, AutoRiven ID: ${level2Category.autoRivenId})`);
         } else {
           this.logger.debug(`⏭️  Skipping duplicate level 2 category: ${level2Category.name} (ID: ${level2Category.allegroId})`);
         }
@@ -244,12 +288,17 @@ export class ScrapingService {
                 ) || href.includes('czesci-samochodowe-'));
               
               if (isExpectedCategory) {
+                const englishName = translateCategory(categoryName);
+                const autoRivenId = this.getNextAutoRivenId();
                 const category: Category = {
                   id: allegroId,
                   name: categoryName,
-                  nameEn: translateCategory(categoryName),
+                  nameEn: englishName,
                   slug: createSlug(categoryName),
+                  englishSlug: createEnglishSlug(englishName),
                   url: href.startsWith('http') ? href : `${this.config.baseUrl}${href}`,
+                  englishUrl: createAutoRivenUrl(createEnglishSlug(englishName), autoRivenId),
+                  autoRivenId,
                   level: 2,
                   parentId,
                   allegroId,
@@ -288,12 +337,17 @@ export class ScrapingService {
                 const categoryName = this.cleanCategoryName(params.name);
                 
                 if (allegroId !== parentId && categoryName.length > 3) {
+                  const englishName = translateCategory(categoryName);
+                  const autoRivenId = this.getNextAutoRivenId();
                   const category: Category = {
                     id: allegroId,
                     name: categoryName,
-                    nameEn: translateCategory(categoryName),
+                    nameEn: englishName,
                     slug: createSlug(categoryName),
+                    englishSlug: createEnglishSlug(englishName),
                     url: href.startsWith('http') ? href : `${this.config.baseUrl}${href}`,
+                    englishUrl: createAutoRivenUrl(createEnglishSlug(englishName), autoRivenId),
+                    autoRivenId,
                     level: 2,
                     parentId,
                     allegroId,
@@ -404,12 +458,17 @@ export class ScrapingService {
               const categoryName = this.cleanCategoryName(text);
               
               if (categoryName && categoryName.length > 3 && allegroId !== parentId) {
+                const englishName = translateCategory(categoryName);
+                const autoRivenId = this.getNextAutoRivenId();
                 const category: Category = {
                   id: allegroId,
                   name: categoryName,
-                  nameEn: translateCategory(categoryName),
+                  nameEn: englishName,
                   slug: createSlug(categoryName),
+                  englishSlug: createEnglishSlug(englishName),
                   url: href.startsWith('http') ? href : `${this.config.baseUrl}${href}`,
+                  englishUrl: createAutoRivenUrl(createEnglishSlug(englishName), autoRivenId),
+                  autoRivenId,
                   level: 3,
                   parentId,
                   allegroId,
@@ -484,12 +543,17 @@ export class ScrapingService {
               const categoryName = this.cleanCategoryName(text);
               
               if (categoryName && categoryName.length > 3 && allegroId !== parentId) {
+                const englishName = translateCategory(categoryName);
+                const autoRivenId = this.getNextAutoRivenId();
                 const category: Category = {
                   id: allegroId,
                   name: categoryName,
-                  nameEn: translateCategory(categoryName),
+                  nameEn: englishName,
                   slug: createSlug(categoryName),
+                  englishSlug: createEnglishSlug(englishName),
                   url: href.startsWith('http') ? href : `${this.config.baseUrl}${href}`,
+                  englishUrl: createAutoRivenUrl(createEnglishSlug(englishName), autoRivenId),
+                  autoRivenId,
                   level: 4,
                   parentId,
                   allegroId,
@@ -613,6 +677,160 @@ export class ScrapingService {
       this.logger.log(`📁 Results saved to: ${filepath}`);
     } catch (error) {
       this.logger.error('Failed to save results:', error);
+    }
+  }
+
+  /**
+   * Scrape all predefined categories to ensure comprehensive coverage
+   */
+  private async scrapePredefinedCategories(categoriesMap: Map<string, Category>): Promise<void> {
+    this.logger.log(`🎯 Scraping ${PREDEFINED_CATEGORY_URLS.length} predefined categories...`);
+    
+    let processed = 0;
+    let added = 0;
+    let skipped = 0;
+    
+    for (const url of PREDEFINED_CATEGORY_URLS) {
+      processed++;
+      
+      if (processed % 50 === 0) {
+        this.logger.log(`📊 Progress: ${processed}/${PREDEFINED_CATEGORY_URLS.length} categories processed`);
+      }
+      
+      try {
+        // Extract category info from URL
+        const hierarchyInfo = getCategoryHierarchyFromUrl(url);
+        
+        if (!hierarchyInfo.allegroId) {
+          this.logger.warn(`⚠️  No Allegro ID found in URL: ${url}`);
+          skipped++;
+          continue;
+        }
+        
+        // Skip if already exists
+        if (categoriesMap.has(hierarchyInfo.allegroId)) {
+          this.logger.debug(`⏭️  Category already exists: ${hierarchyInfo.allegroId}`);
+          skipped++;
+          continue;
+        }
+        
+        // Validate URL exists before scraping
+        const isValid = await this.validateCategoryUrl(url);
+        if (!isValid) {
+          this.logger.warn(`❌ Invalid URL skipped: ${url}`);
+          skipped++;
+          continue;
+        }
+        
+        // Scrape category info
+        const category = await this.scrapeSingleCategory(url, hierarchyInfo, categoriesMap);
+        if (category) {
+          categoriesMap.set(category.allegroId, category);
+          added++;
+          this.logger.debug(`✅ Added predefined category: ${category.name} (Level ${category.level}, ID: ${category.allegroId})`);
+        }
+        
+        // Rate limiting
+        await this.sleep(500);
+        
+      } catch (error) {
+        this.logger.warn(`❌ Failed to scrape predefined category ${url}:`, error.message);
+        skipped++;
+      }
+    }
+    
+    this.logger.log(`📊 Predefined categories summary: ${added} added, ${skipped} skipped, ${processed} total processed`);
+  }
+
+  /**
+   * Validate that a category URL exists and is accessible
+   */
+  private async validateCategoryUrl(url: string): Promise<boolean> {
+    try {
+      const response = await this.httpClient.get(url, { timeout: 10000 });
+      return response.status === 200;
+    } catch (error) {
+      this.logger.debug(`URL validation failed for ${url}:`, error.message);
+      return false;
+    }
+  }
+
+  /**
+   * Scrape a single category from a URL with hierarchy information
+   */
+  private async scrapeSingleCategory(url: string, hierarchyInfo: { level: number; allegroId: string | null; categoryPath: string[] }, categoriesMap: Map<string, Category>): Promise<Category | null> {
+    if (!hierarchyInfo.allegroId) {
+      return null;
+    }
+    
+    try {
+      const response = await this.httpClient.get(url);
+      const $ = cheerio.load(response.data);
+      
+      // Extract category name
+      let categoryName = hierarchyInfo.categoryPath[hierarchyInfo.categoryPath.length - 1];
+      
+      // Try to get better category name from page content
+      const titleSelectors = [
+        'h1',
+        '.category-title',
+        '.page-title',
+        '[data-role="category-title"]',
+        'title'
+      ];
+      
+      for (const selector of titleSelectors) {
+        const titleElement = $(selector).first();
+        if (titleElement.length > 0) {
+          const titleText = titleElement.text().trim();
+          if (titleText && titleText.length > 0 && !titleText.toLowerCase().includes('allegro')) {
+            categoryName = this.cleanCategoryName(titleText);
+            break;
+          }
+        }
+      }
+      
+      // Determine parent ID based on hierarchy
+      let parentId: string | null = null;
+      if (hierarchyInfo.level > 1) {
+        // For level 2+, try to find parent from URL structure or existing categories
+        const urlParts = url.split('/kategoria/')[1]?.split('-');
+        if (urlParts && urlParts.length > 2) {
+          // Look for parent category in existing map
+          const possibleParentPath = urlParts.slice(0, -2).join('-');
+          for (const [id, category] of categoriesMap.entries()) {
+            if (category.url && category.url.includes(possibleParentPath) && category.level === hierarchyInfo.level - 1) {
+              parentId = id;
+              break;
+            }
+          }
+        }
+      }
+      
+      // Create category
+      const englishName = translateCategory(categoryName);
+      const autoRivenId = this.getNextAutoRivenId();
+      const category: Category = {
+        id: hierarchyInfo.allegroId,
+        name: categoryName,
+        nameEn: englishName,
+        slug: createSlug(categoryName),
+        englishSlug: createEnglishSlug(englishName),
+        url: url,
+        englishUrl: createAutoRivenUrl(createEnglishSlug(englishName), autoRivenId),
+        autoRivenId,
+        level: hierarchyInfo.level,
+        parentId,
+        allegroId: hierarchyInfo.allegroId,
+        hasProducts: true,
+        productCount: this.extractProductCount(response.data)
+      };
+      
+      return category;
+      
+    } catch (error) {
+      this.logger.debug(`Failed to scrape single category ${url}:`, error.message);
+      return null;
     }
   }
 

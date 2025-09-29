@@ -6,7 +6,10 @@ export interface Category {
   name: string;
   nameEn: string;
   slug: string;
+  englishSlug: string;
   url: string;
+  englishUrl: string;
+  autoRivenId: number;
   level: number;
   parentId: string | null;
   allegroId: string;
