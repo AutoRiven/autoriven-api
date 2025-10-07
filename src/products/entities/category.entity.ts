@@ -23,13 +23,22 @@ export class Category {
   slug: string;
 
   @Column({ nullable: true })
+  englishSlug: string;
+
+  @Column({ nullable: true })
   description: string;
 
   @Column({ nullable: true })
   allegroId: string;
 
+  @Column({ nullable: true, unique: true })
+  autoRivenId: number;
+
   @Column({ nullable: true })
   allegroUrl: string;
+
+  @Column({ nullable: true })
+  englishUrl: string;
 
   @Column({ default: 0 })
   level: number; // Always 0 for main categories

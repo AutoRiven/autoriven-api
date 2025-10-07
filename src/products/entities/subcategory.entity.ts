@@ -25,13 +25,22 @@ export class Subcategory {
   slug: string;
 
   @Column({ nullable: true })
+  englishSlug: string;
+
+  @Column({ nullable: true })
   description: string;
 
   @Column({ nullable: true })
   allegroId: string;
 
+  @Column({ nullable: true, unique: true })
+  autoRivenId: number;
+
   @Column({ nullable: true })
   allegroUrl: string;
+
+  @Column({ nullable: true })
+  englishUrl: string;
 
   @Column({ default: 1 })
   level: number; // 1-4 for subcategory levels
