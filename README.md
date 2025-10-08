@@ -161,26 +161,78 @@ src/
 
 ## 🔍 Scraping System
 
-The application includes a sophisticated web scraping system for Allegro.pl:
+The application includes a sophisticated web scraping system for Allegro.pl with comprehensive product data extraction.
 
-### Features
+### Enhanced Features (October 2024)
+- ✨ **Dual-Mode Scraping**: Listing pages (quick discovery) + Detail pages (full data)
+- 📸 **Gallery Images**: High-resolution product galleries with automatic quality optimization
+- 📝 **Rich Descriptions**: HTML-preserved product descriptions with formatting and images
+- 🏷️ **Product Codes**: EAN/GTIN extraction for inventory management
+- ⭐ **Seller Information**: Seller names and 5-point rating system
+- 🔗 **Category Association**: Automatic product-to-category linking
+
+### Core Features
 - **Proxy Support**: Uses ScrapeOwl proxy service for reliable scraping
 - **Hierarchical Scraping**: Automatically discovers and maps category hierarchies
 - **Automotive Focus**: Specialized scraping for automotive categories
 - **Fallback Handling**: Handles missing categories with predefined fallbacks
 - **Rate Limiting**: Configurable delays to respect target site limits
 
+### Product Data Extracted
+
+**From Listing Pages**:
+- Product name, price, currency
+- Thumbnail images
+- Basic attributes (condition, manufacturer)
+- Ratings and review counts
+- Free delivery status
+
+**From Detail Pages** (Enhanced):
+- 📸 Gallery images (original quality)
+- 📝 Full HTML description
+- 🏷️ EAN/GTIN product codes
+- 👤 Seller name and rating
+- 🔧 Complete specifications
+- 📦 Product condition and brand
+
 ### Usage
 ```bash
 # Run category scraping
 npm run scrape:categories
+
+# Test product scraping with new fields
+npx ts-node scripts/test-product-scraping.ts
+```
+
+### API Endpoints
+```http
+# Scrape products from category
+POST /api/scraping/scrape-products/:categoryId
+Content-Type: application/json
+{ "maxProducts": 10 }
+
+# Scrape single product by offer ID
+POST /api/scraping/scrape-product/:offerId
 ```
 
 ### Configuration
 Configure scraping in your `.env`:
 ```env
 SCRAPE_DO_TOKEN=your_proxy_token
+ALLEGRO_BASE_URL=https://allegro.pl
 ```
+
+### Database Schema
+
+See `docs/PRODUCT_SCRAPING.md` for complete documentation.
+
+**Recent Migrations**:
+- `1728291000000-AddProductEnhancedFields`: Added descriptionHtml, galleryImages, ean, sellerName, sellerRating
+
+### Documentation
+- 📖 Comprehensive Guide: `docs/PRODUCT_SCRAPING.md`
+- 📊 Enhancement Summary: `SCRAPING_ENHANCEMENT_SUMMARY.md`
+- 🧪 Test Script: `scripts/test-product-scraping.ts`
 
 ## 🔒 Security
 

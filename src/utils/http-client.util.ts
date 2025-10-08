@@ -66,7 +66,7 @@ export class ScrapingHttpClient {
         if (response.status === 200 && response.data) {
           const dataLength = typeof response.data === 'string' ? response.data.length : JSON.stringify(response.data).length;
           this.logger.log(`✅ Successfully fetched ${url} (${dataLength} characters)`);
-          return response;
+          return response.data;
         }
         
         throw new Error(`Invalid response: ${response.status} - ${response.statusText}`);
@@ -131,7 +131,7 @@ export class ScrapingHttpClient {
         
         if (response.status >= 200 && response.status < 300 && response.data) {
           this.logger.log(`✅ Successfully posted to ${url}`);
-          return response;
+          return response.data;
         }
         
         throw new Error(`Invalid response: ${response.status} - ${response.statusText}`);

@@ -18,7 +18,11 @@
     "seed:categories": "ts-node src/database/seeders/category.seeder.ts",
     "lint": "eslint \"{src,apps,libs}/**/*.ts\" --fix",
     "scrape:categories": "ts-node scripts/scrape-categories.ts",
-    "save:categories": "ts-node scripts/save-categories-to-db.ts"
+    "save:categories": "ts-node scripts/save-categories-to-db.ts",
+    "scrape:products": "ts-node scripts/scrape-products.ts",
+    "scrape:products:help": "ts-node scripts/scrape-products.ts --help",
+    "test:product-scraping": "ts-node scripts/test-product-scraping.ts",
+    "test:updated-scraper": "ts-node scripts/test-updated-scraper.ts"
   },
   "repository": {
     "type": "git",

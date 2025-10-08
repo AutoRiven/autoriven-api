@@ -1,4 +1,27 @@
 /**
+ * Polish-English translations for product conditions
+ */
+export const CONDITION_TRANSLATIONS: Record<string, string> = {
+  'Nowy': 'New',
+  'Nowe': 'New',
+  'Nowa': 'New',
+  'Używany': 'Used',
+  'Używane': 'Used',
+  'Używana': 'Used',
+  'Uszkodzony': 'Damaged',
+  'Uszkodzone': 'Damaged',
+  'Uszkodzona': 'Damaged',
+  'Odnowiony': 'Refurbished',
+  'Odnowione': 'Refurbished',
+  'Odnowiona': 'Refurbished',
+  'Po regeneracji': 'Regenerated',
+  'Regenerowany': 'Regenerated',
+  'Oryginalny': 'Original',
+  'Oryginalne': 'Original',
+  'Zamiennik': 'Replacement',
+};
+
+/**
  * Polish-English translations for automotive categories
  */
 export const CATEGORY_TRANSLATIONS: Record<string, string> = {
@@ -280,6 +303,13 @@ export const CATEGORY_TRANSLATIONS: Record<string, string> = {
  */
 export function translateCategory(polishName: string): string {
   return CATEGORY_TRANSLATIONS[polishName] || polishName;
+}
+
+/**
+ * Get English translation for Polish condition
+ */
+export function translateCondition(polishCondition: string): string {
+  return CONDITION_TRANSLATIONS[polishCondition] || polishCondition;
 }
 
 /**

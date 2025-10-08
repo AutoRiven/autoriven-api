@@ -19,17 +19,32 @@ export class Product {
   @Column()
   name: string;
 
+  @Column({ nullable: true })
+  nameEn: string;
+
   @Column()
   slug: string;
 
   @Column({ type: 'text', nullable: true })
   description: string;
 
+  @Column({ type: 'text', nullable: true })
+  descriptionHtml: string;
+
   @Column({ nullable: true })
   allegroId: string;
 
+  @Column({ type: 'integer', unique: true, nullable: true })
+  autoRivenId: number;
+
   @Column({ nullable: true })
   allegroUrl: string;
+
+  @Column({ nullable: true })
+  englishSlug: string;
+
+  @Column({ nullable: true })
+  englishUrl: string;
 
   @Column({ type: 'decimal', precision: 10, scale: 2, nullable: true })
   price: number;
@@ -49,11 +64,38 @@ export class Product {
   @Column({ nullable: true })
   partNumber: string;
 
+  @Column({ nullable: true })
+  manufacturer: string;
+
+  @Column({ nullable: true })
+  condition: string;
+
+  @Column({ nullable: true })
+  ean: string;
+
+  @Column({ type: 'decimal', precision: 3, scale: 2, nullable: true })
+  rating: number;
+
+  @Column({ type: 'integer', default: 0 })
+  reviewCount: number;
+
+  @Column({ default: false })
+  freeDelivery: boolean;
+
   @Column('simple-array', { nullable: true })
   images: string[];
 
+  @Column('simple-array', { nullable: true })
+  galleryImages: string[];
+
   @Column({ type: 'json', nullable: true })
   specifications: Record<string, any>;
+
+  @Column({ nullable: true })
+  sellerName: string;
+
+  @Column({ type: 'decimal', precision: 3, scale: 2, nullable: true })
+  sellerRating: number;
 
   @Column({ default: 0 })
   viewCount: number;
