@@ -22,10 +22,21 @@ export interface Category {
  */
 export interface ScrapingConfig {
   proxyToken: string;
+  proxyTokens?: string[];
   baseUrl: string;
-  userAgent: string;
+  userAgent?: string;
   requestDelay: number;
+  requestDelayJitter?: number;
   maxRetries: number;
+  requestTimeout?: number;
+  productPageTimeout?: number;
+  productRequestDelay?: number;
+  productRequestDelayJitter?: number;
+  productRetryBackoffFactor?: number;
+  superProxyHost?: string;
+  superProxyPort?: number;
+  superProxyPassword?: string;
+  sessionIsolation?: boolean;
 }
 
 /**
@@ -56,6 +67,8 @@ export interface ScrapedProduct {
   description?: string;
   descriptionHtml?: string;
   brand?: string;
+  model?: string; // Product model extracted from description or parameters
+  year?: number; // Year of manufacture/production
   condition?: string;
   seller?: string;
   images: string[];

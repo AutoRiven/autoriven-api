@@ -34,12 +34,40 @@ export class ProductScrapingService {
     @InjectRepository(ProductEntity)
     private productRepository: Repository<ProductEntity>,
   ) {
+    const proxyTokensEnv = this.configService.get<string>('SCRAPE_DO_TOKENS');
+    const primaryProxyToken = this.configService.get<string>('SCRAPE_DO_TOKEN');
+    const proxyTokens = proxyTokensEnv
+      ?.split(',')
+      .map(token => token.trim())
+      .filter(token => token.length > 0);
+
+    const requestDelay = Number(this.configService.get<string>('SCRAPE_REQUEST_DELAY', '2000')) || 2000;
+    const requestDelayJitter = Number(this.configService.get<string>('SCRAPE_REQUEST_DELAY_JITTER', '1000')) || 1000;
+    const productDelay = Number(this.configService.get<string>('SCRAPE_PRODUCT_DELAY_BASE_MS', '3500')) || 3500;
+    const productDelayJitter = Number(this.configService.get<string>('SCRAPE_PRODUCT_DELAY_JITTER_MS', '2000')) || 2000;
+    const productBackoffFactor = Number(this.configService.get<string>('SCRAPE_PRODUCT_BACKOFF_FACTOR', '2')) || 2;
+    const superProxyHost = this.configService.get<string>('SCRAPE_SUPER_PROXY_HOST', 'proxy.scrape.do');
+    const superProxyPort = Number(this.configService.get<string>('SCRAPE_SUPER_PROXY_PORT', '8080')) || 8080;
+    const superProxyPassword = this.configService.get<string>('SCRAPE_SUPER_PROXY_PASSWORD', 'super=true');
+    const sessionIsolation = this.configService.get<string>('SCRAPE_SESSION_ISOLATION', 'false') === 'true';
+
     this.config = {
       baseUrl: this.configService.get<string>('ALLEGRO_BASE_URL', 'https://allegro.pl'),
-      proxyToken: this.configService.get<string>('SCRAPE_DO_TOKEN'),
-      userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-      maxRetries: 3,
-      requestDelay: 2000,
+      proxyToken: primaryProxyToken || proxyTokens?.[0],
+      proxyTokens: proxyTokens?.length ? proxyTokens : undefined,
+      userAgent: this.configService.get<string>('SCRAPE_USER_AGENT') || undefined,
+      maxRetries: Number(this.configService.get<string>('SCRAPE_MAX_RETRIES', '3')) || 3,
+      requestDelay,
+      requestDelayJitter,
+      requestTimeout: Number(this.configService.get<string>('SCRAPE_REQUEST_TIMEOUT', '45000')) || 45000,
+      productPageTimeout: Number(this.configService.get<string>('SCRAPE_PRODUCT_TIMEOUT', '60000')) || 60000,
+      productRequestDelay: productDelay,
+      productRequestDelayJitter: productDelayJitter,
+      productRetryBackoffFactor: productBackoffFactor,
+      superProxyHost,
+      superProxyPort,
+      superProxyPassword,
+      sessionIsolation,
     };
 
     if (!this.config.proxyToken) {
@@ -99,7 +127,7 @@ export class ProductScrapingService {
         this.logger.log(`✅ Scraped and saved ${products.length} products from ${subcategory.name} (Total: ${totalProductsScraped})`);
         
         // Delay between categories to avoid rate limiting
-        await this.delay(3000);
+        await this.pauseBetweenProductRequests(2);
       } catch (error) {
         this.logger.error(`❌ Failed to scrape ${subcategory.name}: ${error.message}`);
       }
@@ -191,9 +219,16 @@ export class ProductScrapingService {
     this.logger.log(`🔍 Scraping product with offer ID: ${offerId}`);
     
     const productUrl = `https://allegro.pl/oferta/${offerId}`;
+    const sessionKey = `offer-${offerId}`;
     
     try {
-      const html = await this.httpClient.get(productUrl);
+      const html = await this.httpClient.get(productUrl, {
+        timeout: this.config.productPageTimeout ?? this.config.requestTimeout ?? 60000,
+        sessionKey,
+        headers: {
+          Referer: this.config.baseUrl,
+        },
+      });
       const product = this.parseProductDetails(html, productUrl);
       
       this.logger.log(`✅ Successfully scraped product: ${product.name}`);
@@ -218,13 +253,17 @@ export class ProductScrapingService {
     const products: ScrapedProduct[] = [];
     let page = 1;
     let hasMorePages = true;
+    const sessionKey = `category-${categoryId}`;
     
     while (hasMorePages && (!maxProducts || products.length < maxProducts)) {
       try {
         const pageUrl = page === 1 ? categoryUrl : `${categoryUrl}?p=${page}`;
         this.logger.debug(`📄 Fetching page ${page}: ${pageUrl}`);
         
-        const html = await this.httpClient.get(pageUrl);
+        const html = await this.httpClient.get(pageUrl, {
+          timeout: this.config.requestTimeout ?? 45000,
+          sessionKey,
+        });
         
         // Parse listing page to get product URLs only
         const productUrls = this.parseProductUrls(html);
@@ -241,18 +280,25 @@ export class ProductScrapingService {
         // Visit each individual product page to get complete details
         for (let i = 0; i < productUrls.length; i++) {
           try {
+            if (i > 0) {
+              await this.pauseBetweenProductRequests();
+            }
             const productUrl = productUrls[i];
             this.logger.debug(`📋 Fetching details for product ${i + 1}/${productUrls.length}: ${productUrl}`);
             
-            const productPageHtml = await this.httpClient.get(productUrl);
+            const productPageHtml = await this.httpClient.get(productUrl, {
+              timeout: this.config.productPageTimeout ?? this.config.requestTimeout ?? 60000,
+              sessionKey,
+              headers: {
+                Referer: pageUrl,
+              },
+            });
             const product = this.parseProductDetails(productPageHtml, productUrl, categoryId);
             
             pageProducts.push(product);
-            
-            // Delay between product page visits to avoid rate limiting
-            await this.delay(1500);
           } catch (error) {
             this.logger.warn(`⚠️ Failed to fetch details for ${productUrls[i]}: ${error.message}`);
+            await this.pauseBetweenProductRequests(this.config.productRetryBackoffFactor ?? 2);
             // Continue with next product
           }
         }
@@ -273,8 +319,8 @@ export class ProductScrapingService {
         
         page++;
         
-        // Delay between pages
-        await this.delay(2000);
+        // Delay between pages with jitter
+        await this.pauseBetweenProductRequests(1.5);
       } catch (error) {
         this.logger.error(`❌ Error scraping page ${page}: ${error.message}`);
         hasMorePages = false;
@@ -568,8 +614,8 @@ export class ProductScrapingService {
 
   /**
    * Parse detailed product information from product page
-   * Based on current Allegro HTML structure (October 2025)
-   * This method extracts comprehensive product details including gallery, description HTML, EAN, and seller info
+   * Based on actual Allegro HTML structure (October 2025)
+   * This method extracts comprehensive product details including gallery, description HTML, EAN, brand, model, year
    */
   private parseProductDetails(html: string, productUrl: string, categoryId?: string): ScrapedProduct {
     const $ = cheerio.load(html);
@@ -578,65 +624,107 @@ export class ProductScrapingService {
     const offerIdMatch = productUrl.match(/\/oferta\/[^\/]*?-?(\d+)(?:\?|$)/);
     const allegroId = offerIdMatch ? offerIdMatch[1] : '';
     
-    // Product name from meta tag (most reliable)
-    const name = $('meta[itemprop="name"]').attr('content') || 
-                 $('h1[data-role="title"]').text().trim() || 
-                 $('h1[itemprop="name"]').text().trim();
+    // Product name from h1 tag (most reliable based on actual HTML)
+    const name = $('h1.mgn2_21').first().text().trim() || 
+                 $('h1').first().text().trim() ||
+                 'Unknown Product';
     
     // Price from meta tag
     const priceText = $('meta[itemprop="price"]').attr('content') || '0';
     const price = this.extractPrice(priceText);
     
-    // Gallery images from showoffer.gallery section
+    // Brand from meta tag (confirmed in HTML at line 9670)
+    const brand = $('meta[itemprop="brand"]').attr('content')?.trim() || '';
+    
+    // Gallery images from thumbnail buttons - convert from s128 to original
     const galleryImages: string[] = [];
-    $('div[data-box-name="showoffer.gallery"] img').each((_, img) => {
-      const imgSrc = $(img).attr('src') || $(img).attr('data-src');
-      if (imgSrc && imgSrc.includes('allegroimg.com')) {
-        // Get the highest quality version
-        const highQualityUrl = imgSrc.replace(/\/s\d+\//, '/original/');
-        if (!galleryImages.includes(highQualityUrl)) {
-          galleryImages.push(highQualityUrl);
+    const seenUrls = new Set<string>();
+    
+    // Get images from gallery thumbnails (actual pattern in HTML)
+    $('button img[src*="allegroimg.com/s128/"]').each((_, img) => {
+      let src = $(img).attr('src');
+      if (src) {
+        // Convert thumbnail to original size
+        src = src.replace(/\/s128\//, '/original/');
+        if (!seenUrls.has(src)) {
+          seenUrls.add(src);
+          galleryImages.push(src);
         }
       }
     });
     
-    // Also check for data-srcset which often contains original URLs
-    $('div[data-box-name="showoffer.gallery"] img[data-srcset]').each((_, img) => {
-      const srcset = $(img).attr('data-srcset') || '';
-      const originalMatch = srcset.match(/https:\/\/[^\s]+\/original\/[^\s]+/);
-      if (originalMatch) {
-        const originalUrl = originalMatch[0];
-        if (!galleryImages.includes(originalUrl)) {
-          galleryImages.push(originalUrl);
+    // Also check for images in description with data-src attribute
+    $('div[itemprop="description"] img[data-src*="allegroimg.com"]').each((_, img) => {
+      let src = $(img).attr('data-src');
+      if (src && src.includes('/original/')) {
+        if (!seenUrls.has(src)) {
+          seenUrls.add(src);
+          galleryImages.push(src);
         }
       }
     });
     
-    // Fallback to regular images array if gallery is empty
-    const images: string[] = [];
-    if (galleryImages.length === 0) {
-      $('img[data-role="gallery-image"], img[itemprop="image"]').each((_, el) => {
-        const src = $(el).attr('src') || $(el).attr('data-src');
-        if (src && !images.includes(src)) {
-          images.push(src);
-        }
-      });
-    }
+    // Primary image is the first gallery image
+    const images = galleryImages.slice(0, 1);
     
     // Description HTML from Description section (preserves formatting and images)
     let descriptionHtml = '';
-    const descriptionContainer = $('div[data-box-name="Description"] div[itemprop="description"]');
+    const descriptionContainer = $('div[itemprop="description"]');
     if (descriptionContainer.length > 0) {
-      descriptionHtml = descriptionContainer.html() || '';
+      descriptionHtml = descriptionContainer.html()?.trim() || '';
     }
     
-    // Plain text description for backwards compatibility
-    const description = descriptionContainer.text().trim() || '';
+    // Plain text description
+    let description = '';
+    if (descriptionContainer.length > 0) {
+      description = descriptionContainer
+        .text()
+        .trim()
+        .replace(/\s+/g, ' ')
+        .substring(0, 1000); // Limit to 1000 chars
+    }
     
-    // EAN/GTIN from meta tag or image alt text
-    let ean = $('meta[itemprop="gtin"]').attr('content') || '';
+    // Extract parameters from the Parameters table (actual HTML structure)
+    let model: string | undefined;
+    let year: number | undefined;
+    let ean: string | undefined;
+    let conditionPolish = 'Unknown';
+    let manufacturer: string | null = brand || null;
+    let partNumber: string | null = null;
+    
+    const specifications: Record<string, any> = {};
+    
+    // Parse parameters table (actual structure from HTML)
+    $('div[data-box-name="Parameters"] table tbody tr').each((_, row) => {
+      const label = $(row).find('td').first().text().trim();
+      const value = $(row).find('td').last().text().trim();
+      
+      const labelLower = label.toLowerCase();
+      
+      // Store in specifications
+      specifications[label] = value;
+      
+      // Extract specific fields
+      if (labelLower.includes('stan')) {
+        conditionPolish = value;
+      } else if (labelLower.includes('producent części') || labelLower.includes('marka')) {
+        manufacturer = value;
+      } else if (labelLower.includes('numer katalogowy')) {
+        partNumber = value;
+        // This could be EAN if it's all digits
+        if (!ean && value.match(/^\d+$/)) {
+          ean = value;
+        }
+      } else if (labelLower.includes('rok produkcji') || labelLower.includes('rocznik')) {
+        const yearMatch = value.match(/\d{4}/);
+        if (yearMatch) {
+          year = parseInt(yearMatch[0], 10);
+        }
+      }
+    });
+    
+    // Try to extract EAN from image alt text as fallback (confirmed pattern in HTML)
     if (!ean) {
-      // Try to extract from image alt text (format: "EAN (GTIN) 0840349928319")
       $('img[alt*="EAN"]').each((_, img) => {
         const altText = $(img).attr('alt') || '';
         const eanMatch = altText.match(/EAN\s*\(GTIN\)\s*(\d+)/i);
@@ -647,11 +735,19 @@ export class ProductScrapingService {
       });
     }
     
+    // Extract model from description text
+    if (!model) {
+      const modelMatch = description.match(/(?:Numer modelu produktu|Model)[:\s]+([A-Z0-9\-]+)/i);
+      if (modelMatch) {
+        model = modelMatch[1];
+      }
+    }
+    
     // Seller information
     let sellerName = '';
     let sellerRating = 0;
     
-    // Extract seller name from sellerInfoHeader section
+    // Extract seller name
     const sellerText = $('div[data-box-name="showoffer.sellerInfoHeader"] div[class*="mp0t_ji"]').text().trim();
     const sellerMatch = sellerText.match(/od\s+(.+)/);
     if (sellerMatch) {
@@ -663,48 +759,11 @@ export class ProductScrapingService {
     const ratingMatch = sellerRatingText.match(/poleca\s+([\d,]+)%/);
     if (ratingMatch) {
       const ratingPercent = parseFloat(ratingMatch[1].replace(',', '.'));
-      // Convert percentage to 5-point scale (99.2% -> 4.96)
       sellerRating = (ratingPercent / 100) * 5;
     }
     
-    // Brand from meta tag
-    const brand = $('meta[itemprop="brand"]').attr('content') || '';
-    
-    // Specifications from parameters table or attributes
-    const specifications: Record<string, any> = {};
-    
-    // Try structured parameters table first
-    $('table[data-role="parameters"] tr').each((_, row) => {
-      const key = $(row).find('td').first().text().trim();
-      const value = $(row).find('td').last().text().trim();
-      if (key && value) {
-        specifications[key] = value;
-      }
-    });
-    
-    // Extract manufacturer and condition from image alt texts (Allegro's current pattern)
-    let manufacturer = brand || null;
-    let condition = 'Unknown';
-    
-    $('img[alt*="Producent"]').each((_, img) => {
-      const altText = $(img).attr('alt') || '';
-      const manufacturerMatch = altText.match(/Producent\s+części\s+(.+?)(?:\s|$)/i);
-      if (manufacturerMatch) {
-        manufacturer = manufacturerMatch[1].trim();
-        return false;
-      }
-    });
-    
-    // Check condition from meta tag
-    const conditionMeta = $('meta[itemprop="itemCondition"]').attr('content') || '';
-    if (conditionMeta.includes('NewCondition')) {
-      condition = 'Nowy';
-    } else if (conditionMeta.includes('UsedCondition')) {
-      condition = 'Używany';
-    }
-    
-    // Translate condition to English
-    const translatedCondition = translateCondition(condition);
+    // Translate condition from Polish to English
+    const translatedCondition = translateCondition(conditionPolish);
     
     const autoRivenId = this.getNextAutoRivenProductId();
     const slug = createSlug(name);
@@ -722,19 +781,22 @@ export class ProductScrapingService {
       englishUrl,
       price,
       currency: 'PLN',
-      description,
-      descriptionHtml,
-      brand,
+      description: description || undefined,
+      descriptionHtml: descriptionHtml || undefined,
+      brand: brand || undefined,
       manufacturer,
-      condition: translatedCondition, // Use translated condition
-      images: galleryImages.length > 0 ? galleryImages.slice(0, 3) : images.slice(0, 3), // First 3 for compatibility
-      galleryImages, // Full gallery
-      ean,
+      partNumber,
+      model: model || undefined,
+      year: year || undefined,
+      condition: translatedCondition,
+      images: images.length > 0 ? images : [],
+      galleryImages,
+      ean: ean || undefined,
       sellerName,
       sellerRating,
       specifications,
       inStock: true,
-      subcategoryId: categoryId, // Add categoryId if provided
+      subcategoryId: categoryId,
     };
   }
 
@@ -870,6 +932,19 @@ export class ProductScrapingService {
     } catch (error) {
       this.logger.error(`❌ Failed to save JSON results: ${error.message}`);
     }
+  }
+
+  private computeProductDelay(multiplier = 1): number {
+    const baseDelay = this.config.productRequestDelay ?? 3500;
+    const jitterMax = this.config.productRequestDelayJitter ?? 2000;
+    const jitter = Math.random() * jitterMax;
+    return Math.max(500, Math.round(baseDelay * multiplier + jitter));
+  }
+
+  private async pauseBetweenProductRequests(multiplier = 1): Promise<void> {
+    const delayDuration = this.computeProductDelay(multiplier);
+    this.logger.debug(`⏱️ Pausing ${delayDuration}ms before next product request`);
+    await this.delay(delayDuration);
   }
 
   /**

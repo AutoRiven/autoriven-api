@@ -33,12 +33,32 @@ export class ScrapingService {
     @InjectRepository(SubcategoryEntity)
     private subcategoryRepository: Repository<SubcategoryEntity>,
   ) {
+    const proxyTokensEnv = this.configService.get<string>('SCRAPE_DO_TOKENS');
+    const primaryProxyToken = this.configService.get<string>('SCRAPE_DO_TOKEN');
+    const proxyTokens = proxyTokensEnv
+      ?.split(',')
+      .map(token => token.trim())
+      .filter(token => token.length > 0);
+
+    const requestDelay = Number(this.configService.get<string>('SCRAPE_REQUEST_DELAY', '2000')) || 2000;
+    const requestDelayJitter = Number(this.configService.get<string>('SCRAPE_REQUEST_DELAY_JITTER', '1000')) || 1000;
+    const superProxyHost = this.configService.get<string>('SCRAPE_SUPER_PROXY_HOST', 'proxy.scrape.do');
+    const superProxyPort = Number(this.configService.get<string>('SCRAPE_SUPER_PROXY_PORT', '8080')) || 8080;
+    const superProxyPassword = this.configService.get<string>('SCRAPE_SUPER_PROXY_PASSWORD', 'super=true');
+    const sessionIsolation = this.configService.get<string>('SCRAPE_SESSION_ISOLATION', 'false') === 'true';
+
     this.config = {
       baseUrl: this.configService.get<string>('ALLEGRO_BASE_URL', 'https://allegro.pl'),
-      proxyToken: this.configService.get<string>('SCRAPE_DO_TOKEN'),
-      userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-      maxRetries: 3,
-      requestDelay: 2000,
+      proxyToken: primaryProxyToken || proxyTokens?.[0],
+      proxyTokens: proxyTokens?.length ? proxyTokens : undefined,
+      userAgent: this.configService.get<string>('SCRAPE_USER_AGENT') || undefined,
+      maxRetries: Number(this.configService.get<string>('SCRAPE_MAX_RETRIES', '3')) || 3,
+      requestDelay,
+      requestDelayJitter,
+      superProxyHost,
+      superProxyPort,
+      superProxyPassword,
+      sessionIsolation,
     };
 
     if (!this.config.proxyToken) {
